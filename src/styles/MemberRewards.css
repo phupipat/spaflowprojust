@@ -1,0 +1,256 @@
+/* Base Styles & Variables */
+:root {
+  --color-primary: #7B4019;
+  --color-secondary: #FF7D29;
+  --color-tertiary: #FFBF78;
+  --color-light: #FFEEA9;
+  --border-radius-sm: 8px;
+  --border-radius-md: 12px;
+  --border-radius-lg: 20px;
+  --box-shadow: 0 4px 15px rgba(123, 64, 25, 0.1);
+  --transition: all 0.3s ease;
+}
+
+/* Layout and Container */
+.rewards-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 15px;
+}
+
+.rewards-header {
+  background: linear-gradient(135deg, var(--color-primary), #8B5E41);
+  border-radius: var(--border-radius-lg);
+  padding: 20px;
+  box-shadow: var(--box-shadow);
+  margin-bottom: 25px;
+  position: relative;
+  overflow: hidden;
+}
+
+.rewards-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 200px;
+  height: 100%;
+  background: radial-gradient(circle at top right, rgba(255, 125, 41, 0.4), transparent 70%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Points Display */
+.points-display {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 12px 20px;
+  border-radius: 50px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.points-icon {
+  color: var(--color-tertiary);
+  margin-right: 12px;
+  font-size: 1.8rem;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.2));
+}
+
+.points-count {
+  font-weight: bold;
+  font-size: 2rem;
+  margin-right: 5px;
+  color: white;
+  line-height: 1;
+}
+
+.points-label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+}
+
+/* Section Titles */
+.section-title {
+  position: relative;
+  padding-left: 15px;
+  margin-bottom: 25px;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.section-title:before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 5px;
+  background: linear-gradient(to bottom, var(--color-primary), var(--color-secondary));
+  border-radius: 3px;
+}
+
+/* Reward Cards */
+.reward-card {
+  transition: var(--transition);
+  border: none;
+  box-shadow: 0 5px 15px rgba(123, 64, 25, 0.08);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  background: white;
+  border-radius: var(--border-radius-lg);
+  height: 100%;
+}
+
+.reward-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(255, 125, 41, 0.15);
+}
+
+.reward-card:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, var(--color-primary), var(--color-secondary));
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.reward-card:hover:before {
+  opacity: 1;
+}
+
+.reward-card-header {
+  background: linear-gradient(135deg, #FFF8F5, #FFF2E6);
+  border-radius: var(--border-radius-md);
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.reward-icon {
+  color: var(--color-secondary);
+  font-size: 2rem;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 3px 6px rgba(255, 125, 41, 0.2));
+}
+
+.reward-points {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: linear-gradient(135deg, var(--color-primary), #5E2E0F);
+  padding: 8px 15px;
+  border-radius: var(--border-radius-md);
+  color: white;
+  gap: 8px;
+}
+
+.point-icon {
+  color: var(--color-tertiary);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(123, 64, 25, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  animation: fadeIn 0.3s ease;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.modal-content {
+  border-radius: var(--border-radius-lg);
+  border: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.modal-header {
+  background: linear-gradient(135deg, var(--color-primary), #5E2E0F);
+  border: none;
+  padding: 20px;
+  color: white;
+}
+
+.modal-footer {
+  border: none;
+  padding: 20px;
+  background: #f8f9fa;
+}
+
+.success-icon {
+  background: linear-gradient(135deg, var(--color-secondary), #E26C20);
+  border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  box-shadow: 0 10px 20px rgba(255, 125, 41, 0.25);
+}
+
+.success-icon i {
+  animation: scaleIn 0.5s ease;
+  color: white;
+  font-size: 3rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+
+.points-badge {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: var(--color-secondary);
+  padding: 10px 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.points-badge .star-icon {
+  color: #ffd700;
+  font-size: 1.8rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.points-badge .points-amount {
+  color: white;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.points-badge .points-label {
+  color: rgba(255,255,255,0.8);
+  font-size: 1rem;
+}

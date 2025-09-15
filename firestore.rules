@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to read/write their own user data
+    match /artifacts/{projectId}/users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow authenticated users to read/write their own user data (alternative path)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow owners to read all user data
+    match /artifacts/{projectId}/users/{userId} {
+      allow read: if request.auth != null && 
+        get(/databases/$(database)/documents/artifacts/$(projectId)/users/$(request.auth.uid)).data.role == 'Owner';
+    }
+    
+    // Allow service management for owners
+    match /artifacts/{projectId}/services/{serviceId} {
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/artifacts/$(projectId)/users/$(request.auth.uid)).data.role == 'Owner';
+    }
+    
+    // Allow booking management
+    match /artifacts/{projectId}/Bookings/{bookingId} {
+      allow read, write: if request.auth != null && (
+        resource.data.userId == request.auth.uid || 
+        get(/databases/$(database)/documents/artifacts/$(projectId)/users/$(request.auth.uid)).data.role in ['Owner', 'Employee']
+      );
+    }
+    
+    match /Bookings/{bookingId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Temporary: Allow all authenticated users to read/write (for development only)
+    // Remove this rule in production!
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

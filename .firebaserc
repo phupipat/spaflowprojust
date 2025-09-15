@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "mapp": "login-spa-7921d",
+    "default": "login-spa-7921d"
+  },
+  "targets": {},
+  "etags": {
+    "login-spa-7921d": {
+      "extensionInstances": {
+        "firestore-send-email": "d9658a11979d11d63064fca355681baf3a1602df4a0196e20a27d021d0e5db6e"
+      }
+    }
+  }
+}

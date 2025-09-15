@@ -1,0 +1,76 @@
+/* fonts.css - นำเข้าฟอนต์สำหรับเว็บไซต์ */
+
+/* IBM Plex Sans Thai */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
+
+/* Noto Sans Thai */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+
+/* Sarabun */
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+/* ตั้งค่าฟอนต์พื้นฐานสำหรับทั้งเว็บไซต์ */
+:root {
+  --font-primary: 'IBM Plex Sans Thai', sans-serif;
+  --font-secondary: 'Noto Sans Thai', sans-serif;
+  --font-tertiary: 'Sarabun', sans-serif;
+}
+
+/* สไตล์สำหรับเนื้อหาทั้งหมด */
+body {
+  font-family: var(--font-primary);
+}
+
+/* สไตล์สำหรับหัวเรื่อง */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-primary);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* สไตล์สำหรับ navbar */
+.navbar-brand {
+  font-family: var(--font-primary);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.navbar-nav .nav-link {
+  font-family: var(--font-primary);
+  font-weight: 500;
+}
+
+/* สไตล์สำหรับปุ่ม */
+.btn {
+  font-family: var(--font-primary);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* สไตล์สำหรับเนื้อหา */
+p, .body-text {
+  font-family: var(--font-primary);
+  line-height: 1.7;
+}
+
+/* สไตล์สำหรับส่วนหัวหลัก */
+.site-heading h1, .page-heading h1 {
+  font-family: var(--font-primary);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.subheading {
+  font-family: var(--font-secondary);
+  font-weight: 400;
+}
+
+/* สไตล์สำหรับฟอร์ม */
+.form-label, .form-control {
+  font-family: var(--font-primary);
+}
+
+/* สไตล์สำหรับ Footer */
+footer {
+  font-family: var(--font-primary);
+}

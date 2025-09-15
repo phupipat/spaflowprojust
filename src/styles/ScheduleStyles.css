@@ -1,0 +1,189 @@
+/* Custom styles for staff schedule */
+.schedule-table th, .schedule-table td {
+  position: relative;
+}
+
+.schedule-table tbody th {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.schedule-table thead th {
+  background-color: rgba(139, 69, 19, 0.05);
+}
+
+/* Current day highlight */
+.schedule-table .current-day {
+  background-color: rgba(139, 69, 19, 0.1);
+}
+
+/* Time slot hover effect */
+.schedule-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+/* Month Calendar Styles */
+.month-calendar {
+  table-layout: fixed;
+}
+
+.month-calendar .calendar-cell {
+  border: 1px solid #dee2e6;
+  padding: 0;
+  position: relative;
+}
+
+.month-calendar .calendar-cell.today {
+  background-color: rgba(255, 140, 64, 0.1);
+  border-color: var(--color-secondary);
+}
+
+.month-calendar .calendar-cell.other-month {
+  background-color: var(--color-background-light);
+}
+
+.month-calendar .calendar-cell:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.date-number {
+  font-weight: 500;
+  font-size: 0.9rem;
+  text-align: center;
+  color: var(--color-text-primary);
+}
+
+.date-number.today-date {
+  background-color: var(--color-secondary);
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  font-weight: bold;
+}
+
+.staff-entry-month {
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.staff-entry-month:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow-sm);
+}
+
+.staff-entries {
+  max-height: 80px;
+  overflow: hidden;
+}
+
+/* Staff day entry styles for daily view */
+.staff-day-entry {
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.staff-day-entry:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Day cell hover effect */
+.schedule-table tbody td:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Staff shift entry styles */
+.staff-shift-entry {
+  display: block;
+  margin-bottom: 2px;
+  padding: 4px 6px;
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.staff-shift-entry:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.staff-shift-entry .fw-bold {
+  display: block;
+  margin-bottom: 1px;
+}
+
+.staff-shift-entry .text-muted {
+  display: block;
+}
+
+/* Position badges */
+.position-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--border-radius-pill);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-right: 5px;
+}
+
+/* Time picker inputs */
+input[type="time"].form-control {
+  padding-right: 0.5rem;
+}
+
+/* Calendar day styles */
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.calendar-day .day-name {
+  font-weight: 500;
+}
+
+.calendar-day .day-date {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* Today highlight in calendar */
+.today-highlight {
+  font-weight: bold;
+  color: var(--color-secondary);
+}
+
+/* Sidebar menu active state */
+.schedule-menu-item.active {
+  background-color: rgba(255, 140, 64, 0.15);
+  border-left: 3px solid var(--color-secondary);
+}
+
+/* Media query for mobile devices */
+@media (max-width: 767.98px) {
+  .schedule-table thead th,
+  .schedule-table tbody th {
+    position: sticky;
+    left: 0;
+    background-color: var(--color-background-light);
+    z-index: 1;
+  }
+  
+  .schedule-table {
+    min-width: 900px;
+  }
+}
