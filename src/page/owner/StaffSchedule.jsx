@@ -74,21 +74,43 @@ function StaffSchedule() {
     try {
       setLoading(true);
       const snap = await getDocs(collection(db, 'Staffs'));
+      
+      if (snap.empty) {
+        console.log('ไม่พบข้อมูลพนักงานในคอลเลกชัน Staffs');
+        
+        // ถ้าไม่พบข้อมูล ให้ตั้งค่าเป็นอาร์เรย์ว่าง
+        setStaffs([]);
+        return;
+      }
+      
       const staffsData = snap.docs.map(doc => {
         const data = doc.data();
-        // Ensure schedules is always an array
+        // ตรวจสอบว่ามีตารางงานหรือไม่
+        const schedules = Array.isArray(data.schedules) ? data.schedules : [];
+        
+        // Debug ข้อมูลตารางงาน
+        if (schedules.length > 0) {
+          console.log(`พนักงาน ${data.name || doc.id} มีตารางงาน ${schedules.length} รายการ`);
+        } else {
+          console.log(`พนักงาน ${data.name || doc.id} ยังไม่มีตารางงาน`);
+        }
+        
         return {
           id: doc.id,
           userId: data.userId || null,
-          name: data.name || '',
+          name: data.name || data.fullname || '',
           email: data.email || '',
           position: data.position || 'พนักงานแผนกนวด',
-          schedules: Array.isArray(data.schedules) ? data.schedules : []
+          schedules: schedules
         };
       });
+      
+      console.log(`โหลดข้อมูลพนักงานทั้งหมด ${staffsData.length} คน`);
       setStaffs(staffsData);
     } catch (error) {
       console.error('Error fetching staff data:', error);
+      // กรณีเกิด error ให้ตั้งค่าเป็นอาร์เรย์ว่าง
+      setStaffs([]);
     } finally {
       setLoading(false);
     }
@@ -250,8 +272,19 @@ function StaffSchedule() {
 
   // Helper to get all staff working on a specific day
   const getStaffForDay = (day) => {
-    return filteredStaffs.filter(staff => {
-      if (!staff.schedules || !Array.isArray(staff.schedules)) return false;
+    // ตรวจสอบว่ามีพนักงานหรือไม่
+    if (!staffs || staffs.length === 0) {
+      console.log(`ไม่พบข้อมูลพนักงานสำหรับวัน ${day}`);
+      return [];
+    }
+
+    // ใช้ staffs ทั้งหมดแทน filteredStaffs เพื่อแก้ปัญหาตอนกรอง
+    let allStaffs = staffs.filter(staff => {
+      if (!staff.schedules || !Array.isArray(staff.schedules)) {
+        return false;
+      }
+      
+      // ตรวจสอบว่ามีการทำงานในวันนี้หรือไม่
       return staff.schedules.some(schedule => schedule.day === day);
     }).map(staff => {
       const daySchedules = staff.schedules.filter(schedule => schedule.day === day);
@@ -260,16 +293,38 @@ function StaffSchedule() {
         daySchedules: daySchedules
       };
     });
+
+    // จากนั้นค่อยกรองตามตำแหน่ง
+    if (filter !== 'all') {
+      allStaffs = allStaffs.filter(staff => staff.position === filter);
+    }
+
+    // กรองตามพนักงาน (ถ้าเลือก)
+    if (selectedStaffFilter !== 'all') {
+      allStaffs = allStaffs.filter(staff => staff.id === selectedStaffFilter);
+    }
+
+    // แสดง console.log เพื่อตรวจสอบผลลัพธ์
+    console.log(`พนักงานวัน ${day}:`, allStaffs.length);
+    
+    return allStaffs;
   };
 
   // Show day details modal
   const showDayDetails = (day, date) => {
+    // ดึงข้อมูลพนักงานที่ทำงานในวันนี้
     const staffForDay = getStaffForDay(day);
+    
+    console.log(`แสดงรายละเอียดวัน ${day}:`, staffForDay);
+    
+    // กำหนดข้อมูลสำหรับ modal
     setSelectedDayDetails({
       day,
       date,
-      staffList: staffForDay
+      staffList: staffForDay || []
     });
+    
+    // แสดง modal
     setShowDetailsModal(true);
   };
   
@@ -381,9 +436,27 @@ function StaffSchedule() {
   const getStaffForDate = (date) => {
     const dayName = days[date.getDay() === 0 ? 6 : date.getDay() - 1];
     
-    let staffForDate = filteredStaffs.filter(staff => {
-      if (!staff.schedules || !Array.isArray(staff.schedules)) return false;
-      return staff.schedules.some(schedule => schedule.day === dayName);
+    // ตรวจสอบว่ามีพนักงานหรือไม่
+    if (!staffs || staffs.length === 0) {
+      console.log("ไม่พบข้อมูลพนักงาน");
+      return [];
+    }
+
+    // ใช้ staffs ทั้งหมดแทน filteredStaffs เพื่อแก้ปัญหาตอนกรอง
+    let allStaffsForDate = staffs.filter(staff => {
+      if (!staff.schedules || !Array.isArray(staff.schedules)) {
+        return false;
+      }
+      
+      // ตรวจสอบว่ามีการทำงานในวันนี้หรือไม่
+      return staff.schedules.some(schedule => {
+        // แสดงรายละเอียดการดีบักเพื่อตรวจสอบ
+        if (schedule.day === dayName) {
+          console.log(`พบพนักงาน ${staff.name} ทำงานวัน ${dayName}:`, schedule);
+          return true;
+        }
+        return false;
+      });
     }).map(staff => {
       const daySchedules = staff.schedules.filter(schedule => schedule.day === dayName);
       return {
@@ -392,12 +465,20 @@ function StaffSchedule() {
       };
     });
 
-    // Apply staff filter if selected
-    if (selectedStaffFilter !== 'all') {
-      staffForDate = staffForDate.filter(staff => staff.id === selectedStaffFilter);
+    // จากนั้นค่อยกรองตามตำแหน่ง
+    if (filter !== 'all') {
+      allStaffsForDate = allStaffsForDate.filter(staff => staff.position === filter);
     }
 
-    return staffForDate;
+    // กรองตามพนักงาน (ถ้าเลือก)
+    if (selectedStaffFilter !== 'all') {
+      allStaffsForDate = allStaffsForDate.filter(staff => staff.id === selectedStaffFilter);
+    }
+
+    // แสดง console.log เพื่อตรวจสอบผลลัพธ์
+    console.log(`พนักงานวันที่ ${date.toLocaleDateString()}:`, allStaffsForDate.length);
+    
+    return allStaffsForDate;
   };
   
   return (
@@ -527,10 +608,10 @@ function StaffSchedule() {
       ) : showMonthView ? (
         // Month Schedule View
         <div className="card border-0 shadow-sm">
-          <div className="card-header bg-light">
+          <div className="card-header" style={{ background: 'linear-gradient(90deg, #b97b3e 0%, #7B4019 100%)', color: '#fff' }}>
             <div className="d-flex justify-content-between align-items-center">
               <h5 className="mb-0">
-                <i className="fas fa-calendar me-2 text-primary"></i>
+                <i className="fas fa-calendar me-2" style={{ color: '#fff' }}></i>
                 {currentDate.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })}
               </h5>
               {selectedStaffFilter !== 'all' && (
@@ -547,12 +628,12 @@ function StaffSchedule() {
             </div>
           </div>
           <div className="card-body p-0">
-            <div className="table-responsive">
-              <table className="table table-bordered month-calendar mb-0">
+            <div className="table-responsive" style={{ overflowX: 'auto' }}>
+              <table className="table table-bordered month-calendar mb-0" style={{ tableLayout: 'fixed', width: '100%', minWidth: '900px' }}>
                 <thead className="table-light">
                   <tr>
                     {daysShort.map((day, index) => (
-                      <th key={index} className="text-center" style={{ width: '14.28%' }}>
+                      <th key={index} className="text-center" style={{ width: '14.28%', minWidth: '120px' }}>
                         {day}
                       </th>
                     ))}
@@ -573,12 +654,12 @@ function StaffSchedule() {
                             key={dayIndex} 
                             className={`calendar-cell position-relative ${!isCurrentMonthDate ? 'other-month' : ''} ${isToday ? 'today' : ''}`}
                             style={{ 
-                              height: '120px', 
+                              height: '150px', 
                               verticalAlign: 'top',
-                              cursor: staffForDate.length > 0 ? 'pointer' : 'default',
-                              opacity: isCurrentMonthDate ? 1 : 0.3
+                              opacity: isCurrentMonthDate ? 1 : 0.3,
+                              width: '14.28%',
+                              minWidth: '130px'
                             }}
-                            onClick={() => staffForDate.length > 0 && showDayDetails(getDayName(date), date)}
                           >
                             <div className="h-100 d-flex flex-column p-1">
                               <div className={`date-number mb-1 ${isToday ? 'today-date' : ''}`}>
@@ -588,41 +669,200 @@ function StaffSchedule() {
                               <div className="flex-grow-1 overflow-hidden">
                                 {staffForDate.length === 0 ? (
                                   isCurrentMonthDate && (
-                                    <div className="text-center text-muted mt-2">
-                                      <small>ไม่มีงาน</small>
+                                    <div className="text-center mt-2 d-flex flex-column align-items-center" style={{ width: '100%' }}>
+                                      <i className="fas fa-calendar-day text-muted mb-1" style={{ fontSize: '1rem' }}></i>
+                                      <small className="text-muted">ว่าง (ไม่มีพนักงาน)</small>
+                                      <button 
+                                        className="btn btn-sm btn-outline-primary mt-2 py-0 px-2" 
+                                        style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          fetchEmployees();
+                                          setShowAddModal(true);
+                                        }}
+                                      >
+                                        <i className="fas fa-plus-circle"></i> เพิ่ม
+                                      </button>
                                     </div>
                                   )
                                 ) : (
-                                  <div className="staff-entries">
-                                    {staffForDate.slice(0, 3).map((staff, staffIndex) => {
-                                      const staffColor = selectedStaffFilter !== 'all' 
-                                        ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
-                                        : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id));
-                                      
-                                      return (
-                                        <div 
-                                          key={staffIndex}
-                                          className="staff-entry-month rounded-1 mb-1 p-1"
-                                          style={{ 
-                                            backgroundColor: `${staffColor}20`,
-                                            borderLeft: `3px solid ${staffColor}`,
-                                            fontSize: '0.7rem'
-                                          }}
-                                        >
-                                          <div className="fw-bold text-truncate" style={{ color: staffColor }}>
-                                            {staff.name}
-                                          </div>
-                                          <div className="text-muted" style={{ fontSize: '0.6rem' }}>
-                                            {staff.daySchedules.length} ช่วง
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                    {staffForDate.length > 3 && (
-                                      <div className="text-muted text-center" style={{ fontSize: '0.65rem' }}>
-                                        +{staffForDate.length - 3} คน
+                                  <div className="staff-entries" style={{ width: '100%' }}>
+                                    {/* แสดงสรุปจำนวนพนักงานทั้งหมด */}
+                                    <div className="d-flex justify-content-between align-items-center mb-1">
+                                      <span className="badge bg-primary rounded-pill">
+                                        <i className="fas fa-users me-1"></i> {staffForDate.length} คน
+                                      </span>
+                                      <div className="legend-container d-flex align-items-center">
+                                        <span className="badge bg-light text-dark border" style={{ fontSize: '0.65rem', whiteSpace: 'nowrap' }}>
+                                          เวลาทำงาน
+                                        </span>
                                       </div>
-                                    )}
+                                    </div>
+
+                                    {/* แสดงภาพรวมเวลาทำงาน */}
+                                    <div className="time-overview mt-1 mb-2" style={{ width: '100%' }}>
+                                      <div className="d-flex align-items-center justify-content-between mb-1">
+                                        <small className="fw-bold text-primary" style={{fontSize: '0.65rem'}}>ช่วงเวลา:</small>
+                                        <small className="text-muted" style={{fontSize: '0.65rem'}}>จำนวนพนักงาน</small>
+                                      </div>
+                                      {[
+                                        { period: 'เช้า', color: 'bg-warning', time: '8:00-12:00', start: 8, end: 12 },
+                                        { period: 'บ่าย', color: 'bg-info', time: '12:00-17:00', start: 12, end: 17 },
+                                        { period: 'เย็น', color: 'bg-primary', time: '17:00-21:00', start: 17, end: 21 }
+                                      ].map((timeSlot, periodIndex) => {
+                                        // ตรวจสอบว่ามีพนักงานทำงานในช่วงเวลานี้หรือไม่
+                                        const hasStaffInPeriod = staffForDate.some(staff => {
+                                          return staff.daySchedules.some(schedule => {
+                                            const startHour = parseInt(schedule.startTime.split(':')[0]);
+                                            const endHour = parseInt(schedule.endTime.split(':')[0]);
+                                            
+                                            if (timeSlot.period === 'เช้า') {
+                                              return startHour >= 8 && startHour < 12;
+                                            } else if (timeSlot.period === 'บ่าย') {
+                                              return (startHour >= 12 && startHour < 17) || 
+                                                     (startHour < 12 && endHour >= 12);
+                                            } else { // เย็น
+                                              return (startHour >= 17) || 
+                                                     (startHour < 17 && endHour >= 17);
+                                            }
+                                          });
+                                        });
+                                        
+                                        // นับจำนวนพนักงานในแต่ละช่วงเวลา
+                                        const staffCountInPeriod = staffForDate.filter(staff => {
+                                          return staff.daySchedules.some(schedule => {
+                                            const startHour = parseInt(schedule.startTime.split(':')[0]);
+                                            const endHour = parseInt(schedule.endTime.split(':')[0]);
+                                            
+                                            if (timeSlot.period === 'เช้า') {
+                                              return startHour >= 8 && startHour < 12;
+                                            } else if (timeSlot.period === 'บ่าย') {
+                                              return (startHour >= 12 && startHour < 17) || 
+                                                     (startHour < 12 && endHour >= 12);
+                                            } else { // เย็น
+                                              return (startHour >= 17) || 
+                                                     (startHour < 17 && endHour >= 17);
+                                            }
+                                          });
+                                        }).length;
+                                        
+                                        return (
+                                          <div 
+                                            key={periodIndex} 
+                                            className="d-flex justify-content-between align-items-center time-period"
+                                            style={{ 
+                                              opacity: hasStaffInPeriod ? 1 : 0.4,
+                                              marginBottom: '4px',
+                                              borderRadius: '3px',
+                                              padding: '2px 3px',
+                                              backgroundColor: hasStaffInPeriod ? 'rgba(255,255,255,0.3)' : 'transparent'
+                                            }}
+                                          >
+                                            <small className="time-label" style={{ fontSize: '0.65rem', minWidth: '20px' }}>
+                                              {timeSlot.period}
+                                            </small>
+                                            <div className="progress flex-grow-1 mx-1" style={{ height: '6px', minWidth: '25px' }}>
+                                              <div 
+                                                className={`progress-bar ${timeSlot.color}`}
+                                                style={{ 
+                                                  width: hasStaffInPeriod ? '100%' : '0%',
+                                                  opacity: hasStaffInPeriod ? 1 : 0.3 
+                                                }}
+                                                title={`${timeSlot.time} (${staffCountInPeriod} คน)`}
+                                              ></div>
+                                            </div>
+                                            <small className="time-range" style={{ fontSize: '0.65rem', fontWeight: 'bold', minWidth: '45px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                              {timeSlot.time}
+                                            </small>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    {/* แสดงรายชื่อพนักงาน */}
+                                    <div className="d-flex flex-column gap-1">
+                                      {staffForDate.map((staff, staffIndex) => {
+                                        // กำหนดสีตามตำแหน่ง เหมือนในมุมมองรายสัปดาห์
+                                        let backgroundColor, borderColor, textColor;
+                                        switch(staff.position) {
+                                          case 'พนักงานแผนกนวด':
+                                            backgroundColor = 'rgba(255, 153, 0, 0.15)';
+                                            borderColor = '#ff9900';
+                                            textColor = '#cc7700';
+                                            break;
+                                          case 'พนักงานแผนกออนเซ็น':
+                                            backgroundColor = 'rgba(40, 167, 69, 0.15)';
+                                            borderColor = '#28a745';
+                                            textColor = '#1e5e2e';
+                                            break;
+                                          case 'พนักงานแผนกสปา':
+                                            backgroundColor = 'rgba(23, 162, 184, 0.15)';
+                                            borderColor = '#17a2b8';
+                                            textColor = '#0d5461';
+                                            break;
+                                          case 'ต้อนรับ':
+                                            backgroundColor = 'rgba(220, 53, 69, 0.15)';
+                                            borderColor = '#dc3545';
+                                            textColor = '#a02a37';
+                                            break;
+                                          case 'ผู้จัดการ':
+                                            backgroundColor = 'rgba(13, 110, 253, 0.15)';
+                                            borderColor = '#0d6efd';
+                                            textColor = '#084298';
+                                            break;
+                                          case 'แม่บ้าน':
+                                            backgroundColor = 'rgba(108, 117, 125, 0.15)';
+                                            borderColor = '#6c757d';
+                                            textColor = '#495057';
+                                            break;
+                                          default:
+                                            backgroundColor = 'rgba(108, 117, 125, 0.15)';
+                                            borderColor = '#6c757d';
+                                            textColor = '#495057';
+                                        }
+                                        
+                                        return (
+                                          <div 
+                                            key={staffIndex}
+                                            className="staff-day-entry rounded-2 p-1"
+                                            style={{ 
+                                              backgroundColor,
+                                              borderLeft: `3px solid ${borderColor}`,
+                                              minHeight: '28px',
+                                              fontSize: '0.7rem',
+                                              cursor: 'pointer'
+                                            }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleEditStaff(staff);
+                                            }}
+                                          >
+                                            <div className="d-flex justify-content-between align-items-center">
+                                              <div className="fw-bold text-truncate" style={{ color: textColor }}>
+                                                {staff.name}
+                                              </div>
+                                              <div className="badge badge-sm" style={{ 
+                                                backgroundColor: `${borderColor}20`,
+                                                color: textColor,
+                                                fontSize: '0.6rem'
+                                              }}>
+                                                {staff.daySchedules.length} ช่วง
+                                              </div>
+                                            </div>
+                                            <div className="small text-muted" style={{ fontSize: '0.65rem' }}>
+                                              {staff.position}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                      {staffForDate.length > 3 && (
+                                        <div className="text-center mt-1">
+                                          <small className="text-muted">
+                                            +{staffForDate.length - 3} คนเพิ่มเติม
+                                          </small>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -673,8 +913,7 @@ function StaffSchedule() {
                         <td 
                           key={dayIndex} 
                           className="position-relative p-3" 
-                          style={{ height: '300px', verticalAlign: 'top', cursor: 'pointer' }}
-                          onClick={() => showDayDetails(day, date)}
+                          style={{ height: '300px', verticalAlign: 'top' }}
                         >
                           <div className="h-100 d-flex flex-column">
                             <div className="mb-2 text-center">
@@ -738,7 +977,12 @@ function StaffSchedule() {
                                         style={{ 
                                           backgroundColor,
                                           borderLeft: `4px solid ${borderColor}`,
-                                          minHeight: '50px'
+                                          minHeight: '50px',
+                                          cursor: 'pointer'
+                                        }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditStaff(staff);
                                         }}
                                       >
                                         <div className="fw-bold text-truncate mb-1" style={{ color: textColor, fontSize: '0.85rem' }}>
@@ -759,10 +1003,17 @@ function StaffSchedule() {
                             </div>
                             
                             <div className="text-center mt-2">
-                              <small className="text-primary">
+                              <button 
+                                className="btn btn-sm btn-outline-primary py-0"
+                                style={{ fontSize: '0.75rem' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  showDayDetails(day, date);
+                                }}
+                              >
                                 <i className="fas fa-info-circle me-1"></i>
-                                คลิกเพื่อดูรายละเอียด
-                              </small>
+                                ดูรายละเอียด
+                              </button>
                             </div>
                           </div>
                         </td>
@@ -963,10 +1214,10 @@ function StaffSchedule() {
 
       {/* Edit Staff Schedule Modal */}
       {showEditModal && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }} tabIndex="-1">
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', marginTop: '48px' }} tabIndex="-1">
+          <div className="modal-dialog modal-lg" style={{ marginTop: '32px' }}>
+            <div className="modal-content" style={{ borderRadius: '16px', overflow: 'visible' }}>
+              <div className="modal-header" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
                 <h5 className="modal-title">
                   <i className="fas fa-calendar-alt me-2 text-primary"></i>
                   จัดตารางงาน: {editShift.name}
@@ -974,8 +1225,8 @@ function StaffSchedule() {
                 <button type="button" className="btn-close" onClick={() => setShowEditModal(false)}></button>
               </div>
               <form onSubmit={handleUpdateStaff}>
-                <div className="modal-body">
-                  <div className="row mb-3">
+                <div className="modal-body" style={{ padding: '2rem 1.5rem' }}>
+                  <div className="row mb-3 g-3">
                     <div className="col-md-6">
                       <label className="form-label">ชื่อพนักงาน</label>
                       <input
@@ -985,6 +1236,7 @@ function StaffSchedule() {
                         required
                         value={editShift.name}
                         onChange={(e) => setEditShift({...editShift, name: e.target.value})}
+                        style={{ minHeight: '44px' }}
                       />
                     </div>
                     <div className="col-md-6">
@@ -993,6 +1245,7 @@ function StaffSchedule() {
                         className="form-select"
                         value={editShift.position}
                         onChange={(e) => setEditShift({...editShift, position: e.target.value})}
+                        style={{ minHeight: '44px' }}
                       >
                         {positions.map((pos, idx) => (
                           <option key={idx} value={pos}>{pos}</option>
@@ -1001,13 +1254,12 @@ function StaffSchedule() {
                     </div>
                   </div>
 
-                  <div className="card border-0 bg-light mb-4">
-                    <div className="card-body">
-                      <h6 className="card-title">เพิ่มตารางงานรายสัปดาห์</h6>
-                      
+                  <div className="card border-0 bg-light mb-4" style={{ borderRadius: '12px' }}>
+                    <div className="card-body" style={{ padding: '1.5rem' }}>
+                      <h6 className="card-title mb-3">เพิ่มตารางงานรายสัปดาห์</h6>
                       <div className="mb-3">
                         <label className="form-label">เลือกวันที่ทำงาน</label>
-                        <div className="row">
+                        <div className="row g-2">
                           {days.map((day, idx) => (
                             <div key={idx} className="col-md-3 col-6 mb-2">
                               <div className="form-check">
@@ -1029,18 +1281,19 @@ function StaffSchedule() {
                                       });
                                     }
                                   }}
+                                  style={{ width: '1.2em', height: '1.2em' }}
                                 />
-                                <label className="form-check-label" htmlFor={`day-${idx}`}>
+                                <label className="form-check-label" htmlFor={`day-${idx}`} style={{ marginLeft: '0.5em', fontSize: '1.05em' }}>
                                   {day}
                                 </label>
                               </div>
                             </div>
                           ))}
                         </div>
-                        <div className="mt-2">
+                        <div className="mt-2 d-flex flex-wrap gap-2">
                           <button 
                             type="button" 
-                            className="btn btn-sm btn-outline-primary me-2"
+                            className="btn btn-sm btn-outline-primary"
                             onClick={() => setNewShift({...newShift, workDays: [...days]})}
                           >
                             เลือกทั้งหมด
@@ -1055,7 +1308,7 @@ function StaffSchedule() {
                         </div>
                       </div>
 
-                      <div className="row g-3 mb-3">
+                      <div className="row g-3 mb-3 align-items-end">
                         <div className="col-md-5">
                           <label className="form-label">เวลาเริ่มงาน</label>
                           <input 
@@ -1063,6 +1316,7 @@ function StaffSchedule() {
                             className="form-control"
                             value={newShift.startTime}
                             onChange={(e) => setNewShift({...newShift, startTime: e.target.value})}
+                            style={{ minHeight: '40px' }}
                           />
                         </div>
                         <div className="col-md-5">
@@ -1072,6 +1326,7 @@ function StaffSchedule() {
                             className="form-control"
                             value={newShift.endTime}
                             onChange={(e) => setNewShift({...newShift, endTime: e.target.value})}
+                            style={{ minHeight: '40px' }}
                           />
                         </div>
                         <div className="col-md-2 d-flex align-items-end">
@@ -1080,13 +1335,14 @@ function StaffSchedule() {
                             className="btn btn-success w-100"
                             onClick={addShiftToStaff}
                             disabled={newShift.workDays.length === 0}
+                            style={{ minHeight: '40px', fontSize: '1.1em' }}
                           >
                             <i className="fas fa-plus"></i>
                           </button>
                         </div>
                       </div>
-                      
-                      <div className="alert alert-info small mb-0">
+
+                      <div className="alert alert-info small mb-0" style={{ fontSize: '1em', padding: '0.75em 1em' }}>
                         <i className="fas fa-info-circle me-1"></i>
                         เลือกวันที่ต้องการทำงานและระบุเวลา จากนั้นกดปุ่มเพิ่มเพื่อสร้างตารางงานสำหรับทุกวันที่เลือก
                       </div>
@@ -1099,8 +1355,8 @@ function StaffSchedule() {
                       <p className="text-muted mb-0">ยังไม่มีตารางงานที่กำหนด</p>
                     </div>
                   ) : (
-                    <div className="table-responsive">
-                      <table className="table table-bordered table-sm">
+                    <div className="table-responsive" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                      <table className="table table-bordered table-sm mb-0" style={{ background: '#fff' }}>
                         <thead className="table-light">
                           <tr>
                             <th>วัน</th>
@@ -1120,6 +1376,7 @@ function StaffSchedule() {
                                   type="button" 
                                   className="btn btn-sm btn-danger"
                                   onClick={() => removeShiftFromStaff(idx)}
+                                  style={{ minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                                 >
                                   <i className="fas fa-trash-alt"></i>
                                 </button>
@@ -1131,9 +1388,9 @@ function StaffSchedule() {
                     </div>
                   )}
                 </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>ยกเลิก</button>
-                  <button type="submit" className="btn btn-primary">บันทึกการเปลี่ยนแปลง</button>
+                <div className="modal-footer" style={{ borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)} style={{ minWidth: '100px' }}>ยกเลิก</button>
+                  <button type="submit" className="btn btn-primary" style={{ minWidth: '140px' }}>บันทึกการเปลี่ยนแปลง</button>
                 </div>
               </form>
             </div>
@@ -1143,8 +1400,8 @@ function StaffSchedule() {
 
       {/* Day Details Modal */}
       {showDetailsModal && selectedDayDetails && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }} tabIndex="-1">
-          <div className="modal-dialog modal-xl">
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', marginTop: '48px' }} tabIndex="-1">
+          <div className="modal-dialog modal-xl" style={{ marginTop: '32px' }}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
@@ -1165,182 +1422,286 @@ function StaffSchedule() {
                     <div className="row mb-4">
                       <div className="col-md-6">
                         <div className="d-flex align-items-center">
-                          <i className="fas fa-users me-2 text-primary"></i>
-                          <span className="fw-bold">จำนวนพนักงาน: {selectedDayDetails.staffList.length} คน</span>
+                          <div className="icon-circle me-2 d-flex align-items-center justify-content-center bg-primary" style={{ width: '40px', height: '40px', borderRadius: '50%' }}>
+                            <i className="fas fa-users text-white"></i>
+                          </div>
+                          <div>
+                            <h5 className="mb-0">จำนวนพนักงาน: {selectedDayDetails.staffList.length} คน</h5>
+                            <div className="text-muted small">ตารางงานประจำวัน</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-md-6 text-md-end">
+                        <div className="badge bg-light text-dark p-2 mb-2">
+                          <i className="far fa-calendar-alt me-1 text-primary"></i>
+                          วันที่: {getFormattedDate(selectedDayDetails.date)}
                         </div>
                       </div>
                     </div>
 
-                    <div className="table-responsive">
-                      <table className="table table-hover align-middle">
-                        <thead className="table-light">
-                          <tr>
-                            <th style={{ width: '25%' }}>ชื่อพนักงาน</th>
-                            <th style={{ width: '20%' }}>ตำแหน่ง</th>
-                            <th style={{ width: '40%' }}>ช่วงเวลาทำงาน</th>
-                            <th style={{ width: '15%' }}>การดำเนินการ</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedDayDetails.staffList.map((staff, index) => {
-                            const staffColor = selectedStaffFilter !== 'all' 
-                              ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
-                              : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id));
-
-                            return (
-                              <tr key={index}>
-                                <td>
-                                  <div className="d-flex align-items-center">
-                                    <div 
-                                      className="icon-circle me-2 d-flex align-items-center justify-content-center" 
-                                      style={{ 
-                                        backgroundColor: selectedStaffFilter !== 'all' 
-                                          ? `${getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))}20`
-                                          : `${getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id))}20`,
-                                        width: '35px',
-                                        height: '35px',
-                                        borderRadius: '50%'
-                                      }}
-                                    >
-                                      <i className="fas fa-user" style={{ 
-                                        color: selectedStaffFilter !== 'all' 
-                                          ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
-                                          : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id)), 
-                                        fontSize: '0.8rem' 
-                                      }}></i>
-                                    </div>
-                                    <div>
-                                      <div className="fw-bold">{staff.name}</div>
-                                      <small className="text-muted">ID: {staff.id.slice(0, 8)}...</small>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td>
-                                  <span 
-                                    className="badge"
-                                    style={{
-                                      backgroundColor: selectedStaffFilter !== 'all' 
-                                        ? `${getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))}20`
-                                        : `${getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id))}20`,
-                                      color: selectedStaffFilter !== 'all' 
-                                        ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
-                                        : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id)),
-                                      border: selectedStaffFilter !== 'all' 
-                                        ? `1px solid ${getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))}40`
-                                        : `1px solid ${getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id))}40`
-                                    }}
-                                  >
-                                    {staff.position}
-                                  </span>
-                                </td>
-                                <td>
-                                  <div className="d-flex flex-column gap-1">
-                                    {staff.daySchedules.map((schedule, scheduleIndex) => (
-                                      <div key={scheduleIndex} className="d-flex align-items-center">
-                                        <i className="fas fa-clock me-2" style={{ 
-                                          color: selectedStaffFilter !== 'all' 
-                                            ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
-                                            : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id)), 
-                                          fontSize: '0.8rem' 
-                                        }}></i>
-                                        <span className="badge bg-light text-dark">
-                                          {schedule.startTime} - {schedule.endTime}
+                    {/* สรุปภาพรวมช่วงเวลาทำงาน */}
+                    <div className="card border-0 shadow-sm mb-4">
+                      <div className="card-body">
+                        <h6 className="card-title mb-3">
+                          <i className="fas fa-chart-bar me-2 text-primary"></i>
+                          ภาพรวมช่วงเวลาทำงาน
+                        </h6>
+                        
+                        <div className="time-slots-overview">
+                          <div className="row g-3">
+                            {['เช้า (8:00-12:00)', 'บ่าย (12:00-17:00)', 'เย็น (17:00-21:00)'].map((period, periodIndex) => {
+                              // ตรวจสอบช่วงเวลา
+                              const timeParts = period.match(/\((\d+):00-(\d+):00\)/);
+                              const startHour = parseInt(timeParts[1]);
+                              const endHour = parseInt(timeParts[2]);
+                              
+                              // หาพนักงานที่ทำงานในช่วงเวลานี้
+                              const staffInPeriod = selectedDayDetails.staffList.filter(staff => {
+                                return staff.daySchedules.some(schedule => {
+                                  const scheduleStartHour = parseInt(schedule.startTime.split(':')[0]);
+                                  const scheduleEndHour = parseInt(schedule.endTime.split(':')[0]);
+                                  
+                                  return (scheduleStartHour < endHour && scheduleEndHour > startHour);
+                                });
+                              });
+                              
+                              const staffCount = staffInPeriod.length;
+                              const percentage = (staffCount / selectedDayDetails.staffList.length) * 100;
+                              
+                              let bgClass, textClass;
+                              if (periodIndex === 0) {
+                                bgClass = 'bg-warning-subtle';
+                                textClass = 'text-warning';
+                              } else if (periodIndex === 1) {
+                                bgClass = 'bg-info-subtle';
+                                textClass = 'text-info';
+                              } else {
+                                bgClass = 'bg-primary-subtle';
+                                textClass = 'text-primary';
+                              }
+                              
+                              return (
+                                <div className="col-md-4" key={periodIndex}>
+                                  <div className={`card border-0 ${bgClass}`}>
+                                    <div className="card-body py-3">
+                                      <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 className={`${textClass} mb-0`}>
+                                          <i className={`fas fa-${periodIndex === 0 ? 'sun' : periodIndex === 1 ? 'cloud-sun' : 'moon'} me-2`}></i>
+                                          {period.split(' ')[0]}
+                                        </h6>
+                                        <span className="badge bg-white text-dark">
+                                          {period.split(' ')[1]}
                                         </span>
-                                        <small className="text-muted ms-2">
-                                          ({Math.round((new Date(`1970-01-01T${schedule.endTime}:00`) - new Date(`1970-01-01T${schedule.startTime}:00`)) / (1000 * 60 * 60))} ชม.)
-                                        </small>
                                       </div>
-                                    ))}
+                                      
+                                      <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <div className="fw-bold">{staffCount} คน</div>
+                                        <div className="text-muted small">{Math.round(percentage)}% ของพนักงานทั้งหมด</div>
+                                      </div>
+                                      
+                                      <div className="progress" style={{ height: '8px' }}>
+                                        <div 
+                                          className={`progress-bar ${periodIndex === 0 ? 'bg-warning' : periodIndex === 1 ? 'bg-info' : 'bg-primary'}`} 
+                                          role="progressbar" 
+                                          style={{ width: `${percentage}%` }}
+                                          aria-valuenow={percentage} 
+                                          aria-valuemin="0" 
+                                          aria-valuemax="100"
+                                        ></div>
+                                      </div>
+                                    </div>
                                   </div>
-                                </td>
-                                <td>
-                                  <button 
-                                    className="btn btn-sm btn-outline-primary"
-                                    onClick={() => {
-                                      handleEditStaff(staff);
-                                      setShowDetailsModal(false);
-                                    }}
-                                  >
-                                    <i className="fas fa-edit me-1"></i>
-                                    แก้ไข
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Time Slots Summary */}
-                    <div className="mt-4">
-                      <h6 className="mb-3">
-                        <i className="fas fa-clock me-2"></i>
-                        ตารางเวลาโดยสรุป
-                      </h6>
-                      <div className="table-responsive">
-                        <table className="table table-sm table-bordered">
-                          <thead className="table-light">
-                            <tr>
-                              <th>เวลา</th>
-                              {selectedDayDetails.staffList.map((staff, index) => (
-                                <th key={index} className="text-center" style={{ minWidth: '120px' }}>
-                                  <div className="d-flex flex-column align-items-center">
-                                    <div 
-                                      className="rounded-circle mb-1" 
-                                      style={{
-                                        width: '20px',
-                                        height: '20px',
-                                        backgroundColor: selectedStaffFilter !== 'all' 
-                                          ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
-                                          : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id))
-                                      }}
-                                    ></div>
-                                    <small>{staff.name}</small>
-                                  </div>
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {timeSlots.map((time, timeIndex) => (
-                              <tr key={timeIndex}>
-                                <th className="bg-light text-center">{time}</th>
-                                {selectedDayDetails.staffList.map((staff, staffIndex) => {
-                                  const isWorking = staff.daySchedules.some(schedule => {
-                                    const convertTimeToMinutes = (timeStr) => {
-                                      const [hours, minutes] = timeStr.split(':').map(Number);
-                                      return hours * 60 + minutes;
-                                    };
-                                    
-                                    const currentMinutes = convertTimeToMinutes(time);
-                                    const startMinutes = convertTimeToMinutes(schedule.startTime);
-                                    const endMinutes = convertTimeToMinutes(schedule.endTime);
-                                    
-                                    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
-                                  });
+                    <div className="row">
+                      <div className="col-md-7">
+                        <div className="card border-0 shadow-sm h-100">
+                          <div className="card-header" style={{ background: 'linear-gradient(90deg, #b97b3e 0%, #7B4019 100%)', color: '#fff' }}>
+                            <h6 className="mb-0">
+                              <i className="fas fa-user-clock me-2" style={{ color: '#fff' }}></i>
+                              รายชื่อพนักงานและช่วงเวลาทำงาน
+                            </h6>
+                          </div>
+                          <div className="card-body p-0">
+                            <div className="table-responsive">
+                              <table className="table table-hover align-middle mb-0">
+                                <thead className="table-light">
+                                  <tr>
+                                    <th style={{ width: '45%' }}>ชื่อพนักงาน / ตำแหน่ง</th>
+                                    <th style={{ width: '45%' }}>ช่วงเวลาทำงาน</th>
+                                    <th style={{ width: '10%' }} className="text-center">จัดการ</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {selectedDayDetails.staffList.map((staff, index) => {
+                                    const staffColor = selectedStaffFilter !== 'all' 
+                                      ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
+                                      : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id));
 
-                                  return (
-                                    <td key={staffIndex} className="text-center">
-                                      {isWorking ? (
-                                        <i 
-                                          className="fas fa-check-circle" 
-                                          style={{ 
-                                            color: selectedStaffFilter !== 'all' 
-                                              ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
-                                              : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id))
-                                          }}
-                                        ></i>
-                                      ) : (
-                                        <i className="fas fa-times-circle text-muted"></i>
-                                      )}
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                    return (
+                                      <tr key={index}>
+                                        <td>
+                                          <div className="d-flex align-items-center">
+                                            <div 
+                                              className="icon-circle me-2 d-flex align-items-center justify-content-center" 
+                                              style={{ 
+                                                backgroundColor: `${staffColor}20`,
+                                                width: '32px',
+                                                height: '32px',
+                                                borderRadius: '50%'
+                                              }}
+                                            >
+                                              <i className="fas fa-user" style={{ color: staffColor }}></i>
+                                            </div>
+                                            <div>
+                                              <div className="fw-bold">{staff.name}</div>
+                                              <span className="badge" style={{ 
+                                                backgroundColor: `${staffColor}15`, 
+                                                color: staffColor,
+                                                border: `1px solid ${staffColor}30`
+                                              }}>
+                                                {staff.position}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td>
+                                          <div className="d-flex flex-column gap-1">
+                                            {staff.daySchedules.map((schedule, scheduleIndex) => {
+                                              // คำนวณชั่วโมงการทำงาน
+                                              const startTime = new Date(`1970-01-01T${schedule.startTime}:00`);
+                                              const endTime = new Date(`1970-01-01T${schedule.endTime}:00`);
+                                              const hoursWorked = (endTime - startTime) / (1000 * 60 * 60);
+                                              
+                                              return (
+                                                <div key={scheduleIndex} className="d-flex align-items-center">
+                                                  <span className="badge bg-light text-dark border" style={{ fontSize: '0.85rem' }}>
+                                                    <i className="far fa-clock me-1" style={{ color: staffColor }}></i>
+                                                    {schedule.startTime} - {schedule.endTime}
+                                                  </span>
+                                                  <div className="ms-2 text-muted small">
+                                                    ({Math.round(hoursWorked * 10) / 10} ชั่วโมง)
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </td>
+                                        <td className="text-center">
+                                          <button 
+                                            className="btn btn-sm btn-outline-primary"
+                                            onClick={() => {
+                                              handleEditStaff(staff);
+                                              setShowDetailsModal(false);
+                                            }}
+                                          >
+                                            <i className="fas fa-edit"></i>
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="col-md-5">
+                        <div className="card border-0 shadow-sm h-100">
+                          <div className="card-header" style={{ background: 'linear-gradient(90deg, #b97b3e 0%, #7B4019 100%)', color: '#fff' }}>
+                            <h6 className="mb-0">
+                              <i className="fas fa-clock me-2" style={{ color: '#fff' }}></i>
+                              ตารางเวลาแต่ละชั่วโมง
+                            </h6>
+                          </div>
+                          <div className="card-body p-0">
+                            <div className="table-responsive" style={{ maxHeight: '350px', overflowY: 'auto' }}>
+                              <table className="table table-sm table-bordered mb-0">
+                                <thead className="sticky-top bg-white">
+                                  <tr>
+                                    <th className="text-center" style={{ width: '70px' }}>เวลา</th>
+                                    <th>พนักงานทำงาน</th>
+                                    <th className="text-center" style={{ width: '80px' }}>จำนวน</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {Array.from({ length: 14 }, (_, i) => (i + 8).toString().padStart(2, '0') + ':00').map((time, timeIndex) => {
+                                    // หาพนักงานที่ทำงานในช่วงเวลานี้
+                                    const staffWorking = selectedDayDetails.staffList.filter(staff => {
+                                      return staff.daySchedules.some(schedule => {
+                                        const startHour = parseInt(schedule.startTime.split(':')[0]);
+                                        const startMinute = parseInt(schedule.startTime.split(':')[1]);
+                                        const endHour = parseInt(schedule.endTime.split(':')[0]);
+                                        const endMinute = parseInt(schedule.endTime.split(':')[1]);
+                                        
+                                        const timeHour = parseInt(time.split(':')[0]);
+                                        
+                                        return (startHour < timeHour || (startHour === timeHour && startMinute === 0)) && 
+                                               (endHour > timeHour || (endHour === timeHour && endMinute > 0));
+                                      });
+                                    });
+                                    
+                                    const staffCount = staffWorking.length;
+                                    const isHighStaffTime = staffCount >= selectedDayDetails.staffList.length * 0.7;
+                                    const isLowStaffTime = staffCount <= selectedDayDetails.staffList.length * 0.3;
+                                    
+                                    return (
+                                      <tr key={timeIndex} className={isHighStaffTime ? 'table-success' : isLowStaffTime ? 'table-light' : ''}>
+                                        <td className="text-center fw-bold">
+                                          {time}
+                                        </td>
+                                        <td>
+                                          <div className="d-flex flex-wrap gap-1 align-items-center">
+                                            {staffCount === 0 ? (
+                                              <span className="text-muted">-</span>
+                                            ) : (
+                                              staffWorking.map((staff, staffIdx) => {
+                                                const staffColor = selectedStaffFilter !== 'all' 
+                                                  ? getStaffColor(filteredStaffs.findIndex(s => s.id === selectedStaffFilter))
+                                                  : getStaffColor(filteredStaffs.findIndex(s => s.id === staff.id));
+                                                
+                                                return (
+                                                  <span 
+                                                    key={staffIdx} 
+                                                    className="badge rounded-pill" 
+                                                    style={{
+                                                      backgroundColor: `${staffColor}20`,
+                                                      color: staffColor,
+                                                      border: `1px solid ${staffColor}30`,
+                                                      fontSize: '0.7rem'
+                                                    }}
+                                                  >
+                                                    {staff.name.split(' ')[0]}
+                                                  </span>
+                                                );
+                                              })
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="text-center">
+                                          <span className={`badge ${
+                                            isHighStaffTime ? 'bg-success' : 
+                                            isLowStaffTime ? 'bg-light text-dark' : 'bg-primary'
+                                          }`}>
+                                            {staffCount}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

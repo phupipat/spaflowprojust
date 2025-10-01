@@ -208,10 +208,10 @@ function MemberSettings() {
 
   return (
     <div className="container py-4">
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-header bg-white py-3">
+      <div className="card shadow-sm border-0 mb-4" style={{ border: '2px solid #7B4019', borderRadius: '16px' }}>
+        <div className="card-header py-3" style={{ background: 'linear-gradient(90deg, #a86a3d 0%, #7B4019 100%)', color: '#fff', borderTopLeftRadius: '14px', borderTopRightRadius: '14px', borderBottom: '2px solid #7B4019' }}>
           <h4 className="mb-0 fw-bold">
-            <i className="fas fa-users-cog me-2" style={{ color: '#ff9900' }}></i>
+            <i className="fas fa-users-cog me-2" style={{ color: '#fff' }}></i>
             ระบบจัดการสมาชิก
           </h4>
         </div>
@@ -308,10 +308,10 @@ function MemberSettings() {
             <>
 
               {/* รายชื่อสมาชิก */}
-              <div className="card shadow-sm">
-                <div className="card-header bg-light d-flex justify-content-between align-items-center">
+              <div className="card shadow-sm" style={{ border: '2px solid #7B4019', borderRadius: '16px' }}>
+                <div className="card-header d-flex justify-content-between align-items-center" style={{ background: 'linear-gradient(90deg, #a86a3d 0%, #7B4019 100%)', color: '#fff', borderTopLeftRadius: '14px', borderTopRightRadius: '14px', borderBottom: '2px solid #7B4019' }}>
                   <h5 className="mb-0">
-                    <i className="fas fa-users me-2 text-primary"></i>
+                    <i className="fas fa-users me-2" style={{ color: '#fff' }}></i>
                     รายชื่อสมาชิก
                   </h5>
                   <span className="badge bg-primary">{members.length} คน</span>
@@ -432,7 +432,7 @@ function MemberSettings() {
           {activeSection === 'profile' && selectedMember && (
             <div className="row">
               <div className="col-md-4">
-                <div className="card shadow-sm mb-4">
+                <div className="card shadow-sm mb-4" style={{ border: '2px solid #7B4019', borderRadius: '16px' }}>
                   <div className="card-body text-center py-4">
                     <div 
                       className="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center"
@@ -478,10 +478,10 @@ function MemberSettings() {
                   </div>
                 </div>
 
-                <div className="card shadow-sm">
-                  <div className="card-header bg-light">
+                <div className="card shadow-sm" style={{ border: '2px solid #7B4019', borderRadius: '16px' }}>
+                  <div className="card-header" style={{ background: 'linear-gradient(90deg, #a86a3d 0%, #7B4019 100%)', color: '#fff', borderTopLeftRadius: '14px', borderTopRightRadius: '14px', borderBottom: '2px solid #7B4019' }}>
                     <h5 className="mb-0">
-                      <i className="fas fa-tags me-2 text-primary"></i>
+                      <i className="fas fa-tags me-2" style={{ color: '#fff' }}></i>
                       ส่วนลดตามแต้มสะสม
                     </h5>
                   </div>
@@ -519,10 +519,10 @@ function MemberSettings() {
               </div>
               
               <div className="col-md-8">
-                <div className="card shadow-sm mb-4">
-                  <div className="card-header bg-light">
+                <div className="card shadow-sm mb-4" style={{ border: '2px solid #7B4019', borderRadius: '16px' }}>
+                  <div className="card-header" style={{ background: 'linear-gradient(90deg, #a86a3d 0%, #7B4019 100%)', color: '#fff', borderTopLeftRadius: '14px', borderTopRightRadius: '14px', borderBottom: '2px solid #7B4019' }}>
                     <h5 className="mb-0">
-                      <i className="fas fa-star me-2 text-warning"></i>
+                      <i className="fas fa-star me-2" style={{ color: '#fff' }}></i>
                       สถานะแต้มสะสม
                     </h5>
                   </div>
@@ -594,10 +594,10 @@ function MemberSettings() {
                 </div>
                 
                 {/* ประวัติการเปลี่ยนแปลงแต้ม */}
-                <div className="card shadow-sm">
-                  <div className="card-header bg-light">
+                <div className="card shadow-sm" style={{ border: '2px solid #7B4019', borderRadius: '16px' }}>
+                  <div className="card-header" style={{ background: 'linear-gradient(90deg, #a86a3d 0%, #7B4019 100%)', color: '#fff', borderTopLeftRadius: '14px', borderTopRightRadius: '14px', borderBottom: '2px solid #7B4019' }}>
                     <h5 className="mb-0">
-                      <i className="fas fa-history me-2 text-secondary"></i>
+                      <i className="fas fa-history me-2" style={{ color: '#fff' }}></i>
                       ประวัติการเปลี่ยนแปลงแต้ม
                     </h5>
                   </div>

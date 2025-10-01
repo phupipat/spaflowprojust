@@ -1,7 +1,7 @@
 // src/pages/employee/DashboardEmployee.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { db } from '../../Firebase'; 
-import { collection, query, where, getDocs, doc, updateDoc, getDoc, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc as firestoreDoc, updateDoc, getDoc, orderBy, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -26,16 +26,18 @@ function DashboardEmployee() {
   const [averageRating, setAverageRating] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [employeeData, setEmployeeData] = useState(null);
+  const [employeePhone, setEmployeePhone] = useState('');
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [appointmentFilter, setAppointmentFilter] = useState('all'); // 'all', 'ongoing', 'completed'
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  // In-memory cache for service names to reduce Firestore reads
+  const serviceCacheRef = React.useRef({});
 
   useEffect(() => {
-    // Update current time every minute
+    // Update current time every 30 seconds (for auto-refresh)
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000);
-
+    }, 30000);
     return () => clearInterval(timer);
   }, []);
 
@@ -70,7 +72,7 @@ function DashboardEmployee() {
         console.log('=== FETCHING EMPLOYEE DATA ===');
         console.log('Current employee ID:', user.uid);
         
-        // Get employee details
+  // ดึงรายละเอียดของผู้ใช้งาน (พนักงาน)
         const userQuery = query(
           collection(db, 'artifacts/login-spa-7921d/users'),
           where('__name__', '==', user.uid)
@@ -80,7 +82,7 @@ function DashboardEmployee() {
         setUserName(userData?.fullname || userData?.name || 'พนักงาน');
         console.log('Employee name:', userData?.fullname || userData?.name || 'พนักงาน');
 
-        // Get staff details from Staffs collection
+  // ดึงข้อมูลพนักงานจากคอลเลกชัน Staffs
         const staffQuery = query(
           collection(db, 'Staffs'),
           where('userId', '==', user.uid)
@@ -100,11 +102,26 @@ function DashboardEmployee() {
           
           const monthlyData = generateMonthlySchedule(staffSchedules);
           setMonthlySchedules(monthlyData);
+          // Prefer phone from Users collection (userData) but fall back to staff record
+          try {
+            const phoneFromUser = userData?.phone;
+            const phoneFromStaff = staffData?.phone;
+            if (phoneFromUser) setEmployeePhone(phoneFromUser);
+            else if (phoneFromStaff) setEmployeePhone(phoneFromStaff);
+          } catch (err) {
+            console.error('Error setting employee phone from staff data:', err);
+          }
         } else {
           console.log('No staff data found');
+          // Still set phone from user document if available
+          try {
+            if (userData?.phone) setEmployeePhone(userData.phone);
+          } catch (err) {
+            console.error('Error setting employee phone from user data:', err);
+          }
         }
 
-        // Get appointments - ดึงการจองทั้งหมดที่เกี่ยวข้องกับพนักงานคนนี้ โดยไม่สนใจสถานะ
+  // ดึงการจองทั้งหมดที่เกี่ยวข้องกับพนักงานคนนี้ (ไม่กรองตามสถานะ)
         console.log('Fetching bookings for employee:', user.uid);
         let bookingsQuery = query(
           collection(db, 'Bookings'),
@@ -120,19 +137,29 @@ function DashboardEmployee() {
         const approvedBookingsSnapshot = await getDocs(approvedBookingsQuery);
         console.log(`Found ${bookingsSnapshot.size} direct bookings for employee`);
         console.log(`Found ${approvedBookingsSnapshot.size} approved bookings total`);
+        // Debug: show raw docs
+        try {
+          console.log('bookingsSnapshot.docs ids:', bookingsSnapshot.docs.map(d => d.id));
+          console.log('approvedBookingsSnapshot.docs ids:', approvedBookingsSnapshot.docs.map(d => d.id));
+        } catch (e) {
+          console.error('Error logging snapshots:', e);
+        }
         
         // รวมข้อมูลการจองทั้งที่กำหนดให้พนักงานคนนี้แล้ว และที่มีสถานะ "ยืนยันแล้ว"
         const bookingsData = [];
         const processedIds = new Set(); // เก็บ ID ที่ได้ประมวลผลไปแล้ว เพื่อป้องกันข้อมูลซ้ำ
         
         // เพิ่มข้อมูลการจองที่กำหนดให้พนักงานคนนี้ก่อน
-        for (const doc of bookingsSnapshot.docs) {
-          const data = doc.data();
-          const docId = doc.id;
+        for (const bookingDoc of bookingsSnapshot.docs) {
+          const data = bookingDoc.data();
+          const docId = bookingDoc.id;
+          console.log('Processing bookingDoc id:', docId, 'raw data keys:', Object.keys(data || {}));
           
           // จัดการกับข้อมูล timestamp อย่างปลอดภัย
           let createdAtDate = new Date();
           let bookingDate = null;
+          let dateISO = null;
+          let timeStr = '';
           
           // แปลงวันที่สร้างการจอง
           try {
@@ -147,7 +174,7 @@ function DashboardEmployee() {
             console.error('Error converting timestamp for createdAt:', e);
           }
           
-          // แปลงวันที่การจอง
+          // แปลงวันที่การจอง (normalize เป็น Date และ ISO string)
           const dateField = getBookingDate(data);
           try {
             if (dateField && typeof dateField.toDate === 'function') {
@@ -157,15 +184,50 @@ function DashboardEmployee() {
             } else if (dateField) {
               bookingDate = new Date(dateField);
             }
+
+            if (bookingDate && !Number.isNaN(bookingDate.getTime())) {
+              dateISO = bookingDate.toISOString().split('T')[0];
+            }
           } catch (e) {
             console.error('Error converting booking date:', e);
           }
+
+          // Normalize time string
+          timeStr = data.time || data.bookingTime || data.timeSlot || '';
           
           // ดึงชื่อลูกค้าจาก users collection
           let customerName = data.customerName || 'ลูกค้า';
+          // ดึงชื่อบริการจาก Services collection ถ้ามีการเก็บเป็น serviceId หรือ service (string id)
+          let resolvedServiceName = data.service || data.serviceName || '';
+          try {
+            const serviceId = data.serviceId || (typeof data.service === 'string' ? data.service : null) || (data.service && data.service.id ? data.service.id : null);
+            if (serviceId) {
+              // check cache first
+              if (serviceCacheRef.current[serviceId]) {
+                resolvedServiceName = serviceCacheRef.current[serviceId];
+              } else {
+                const serviceDocRef = firestoreDoc(db, 'Services', serviceId);
+                const serviceDoc = await getDoc(serviceDocRef);
+                if (serviceDoc.exists()) {
+                  const serviceData = serviceDoc.data();
+                  if (serviceData && serviceData.name) {
+                    resolvedServiceName = serviceData.name;
+                    serviceCacheRef.current[serviceId] = serviceData.name; // cache it
+                    console.log('Resolved service from DB and cached:', serviceId, serviceData.name);
+                  }
+                } else {
+                  console.log('Service doc not found for id:', serviceId);
+                }
+              }
+            } else if (data.service && typeof data.service === 'object' && data.service.name) {
+              resolvedServiceName = data.service.name;
+            }
+          } catch (err) {
+            console.error('Error resolving service name for booking', docId, err);
+          }
           if (data.userId) {
             try {
-              const userDocRef = doc(db, 'artifacts/login-spa-7921d/users', data.userId);
+              const userDocRef = firestoreDoc(db, 'artifacts/login-spa-7921d/users', data.userId);
               const userDoc = await getDoc(userDocRef);
               if (userDoc.exists()) {
                 const userData = userDoc.data();
@@ -181,23 +243,32 @@ function DashboardEmployee() {
             ...data,
             customerName,
             createdAt: createdAtDate,
-            normalizedDate: bookingDate
+            // date in ISO yyyy-mm-dd for filtering/calendar
+            date: dateISO || (data.date ? (new Date(data.date).toISOString().split('T')[0]) : undefined),
+            // normalized time string
+            time: timeStr || data.time || data.bookingTime,
+            // normalizedDate as ISO datetime string for sorting
+            normalizedDate: bookingDate && !Number.isNaN(bookingDate.getTime()) ? bookingDate.toISOString() : (createdAtDate ? createdAtDate.toISOString() : null)
+          ,
+            serviceName: resolvedServiceName
           });
+
+          console.log('Pushed booking id:', docId, 'normalizedDate:', bookingsData[bookingsData.length-1].normalizedDate, 'date:', bookingsData[bookingsData.length-1].date, 'time:', bookingsData[bookingsData.length-1].time);
           
           processedIds.add(docId); // เพิ่ม ID ที่ประมวลผลแล้ว
         }
         
         // เพิ่มข้อมูลการจองที่มีสถานะ "ยืนยันแล้ว" และยังไม่ได้กำหนดพนักงาน
-        for (const doc of approvedBookingsSnapshot.docs) {
-          const data = doc.data();
-          const docId = doc.id;
+        for (const approvedDoc of approvedBookingsSnapshot.docs) {
+          const data = approvedDoc.data();
+          const docId = approvedDoc.id;
 
           if (!processedIds.has(docId)) {
             // ดึงชื่อลูกค้าจาก users collection
             let customerName = data.customerName || 'ลูกค้า';
             if (data.userId) {
               try {
-                const userDocRef = doc(db, 'artifacts/login-spa-7921d/users', data.userId);
+                const userDocRef = firestoreDoc(db, 'artifacts/login-spa-7921d/users', data.userId);
                 const userDoc = await getDoc(userDocRef);
                 if (userDoc.exists()) {
                   const userData = userDoc.data();
@@ -207,31 +278,104 @@ function DashboardEmployee() {
                 console.log('Error fetching customer name:', error);
               }
             }
-            
-            bookingsData.push({ id: docId, ...data, customerName });
+
+            // Normalize date/time for approved bookings as well
+            let approvedCreatedAt = new Date();
+            try {
+              if (data.createdAt && typeof data.createdAt.toDate === 'function') approvedCreatedAt = data.createdAt.toDate();
+              else if (data.createdAt instanceof Date) approvedCreatedAt = data.createdAt;
+              else if (data.createdAt) approvedCreatedAt = new Date(data.createdAt);
+            } catch (e) {
+              console.error('Error parsing approved createdAt:', e);
+            }
+
+            let approvedBookingDate = null;
+            let approvedDateISO = null;
+            try {
+              const df = getBookingDate(data);
+              if (df && typeof df.toDate === 'function') approvedBookingDate = df.toDate();
+              else if (df instanceof Date) approvedBookingDate = df;
+              else if (df) approvedBookingDate = new Date(df);
+              if (approvedBookingDate && !Number.isNaN(approvedBookingDate.getTime())) approvedDateISO = approvedBookingDate.toISOString().split('T')[0];
+            } catch (e) {
+              console.error('Error converting approved booking date:', e);
+            }
+
+            const approvedTimeStr = data.time || data.bookingTime || data.timeSlot || '';
+            // Resolve service name for approved bookings too
+            let approvedResolvedServiceName = data.service || data.serviceName || '';
+            try {
+              const serviceId = data.serviceId || (typeof data.service === 'string' ? data.service : null) || (data.service && data.service.id ? data.service.id : null);
+              if (serviceId) {
+                if (serviceCacheRef.current[serviceId]) {
+                  approvedResolvedServiceName = serviceCacheRef.current[serviceId];
+                } else {
+                  const serviceDocRef = firestoreDoc(db, 'Services', serviceId);
+                  const serviceDoc = await getDoc(serviceDocRef);
+                  if (serviceDoc.exists()) {
+                    const serviceData = serviceDoc.data();
+                    if (serviceData && serviceData.name) {
+                      approvedResolvedServiceName = serviceData.name;
+                      serviceCacheRef.current[serviceId] = serviceData.name;
+                      console.log('Resolved approved service from DB and cached:', serviceId, serviceData.name);
+                    }
+                  } else {
+                    console.log('Service doc not found for approved id:', serviceId);
+                  }
+                }
+              } else if (data.service && typeof data.service === 'object' && data.service.name) {
+                approvedResolvedServiceName = data.service.name;
+              }
+            } catch (err) {
+              console.error('Error resolving service name for approved booking', docId, err);
+            }
+
+            bookingsData.push({
+              id: docId,
+              ...data,
+              customerName,
+              createdAt: approvedCreatedAt,
+              date: approvedDateISO || (data.date ? (new Date(data.date).toISOString().split('T')[0]) : undefined),
+              time: approvedTimeStr,
+              normalizedDate: approvedBookingDate && !Number.isNaN(approvedBookingDate.getTime()) ? approvedBookingDate.toISOString() : (approvedCreatedAt ? approvedCreatedAt.toISOString() : null)
+            ,
+              serviceName: approvedResolvedServiceName
+            });
+
+            console.log('Pushed approved booking id:', docId, 'normalizedDate:', bookingsData[bookingsData.length-1].normalizedDate);
+
             processedIds.add(docId);
           }
         }
         
-        // Sort by date and time
+        // Debug before sorting
+        console.log('bookingsData length before sort:', bookingsData.length);
+        console.log('bookingsData sample before sort:', bookingsData.slice(0,3));
+
+        // Sort by normalizedDate (ISO datetime string) or createdAt fallback
         const sortedData = bookingsData.sort((a, b) => {
-          const dateA = new Date(`${a.date} ${a.time}`);
-          const dateB = new Date(`${b.date} ${b.time}`);
-          return dateA - dateB;
+          const da = a.normalizedDate ? new Date(a.normalizedDate) : (a.createdAt ? new Date(a.createdAt) : new Date());
+          const db = b.normalizedDate ? new Date(b.normalizedDate) : (b.createdAt ? new Date(b.createdAt) : new Date());
+          return da - db;
         });
-        
+
+        console.log('sortedData length after sort:', sortedData.length);
+        console.log('sortedData sample after sort:', sortedData.slice(0,3));
+              
         setAppointments(sortedData);
+        console.log('setAppointments called with length:', sortedData.length);
+            console.log('Fetched bookings sample:', sortedData.slice(0, 5));
         
         // Filter today's appointments
         const today = new Date().toISOString().split('T')[0];
         const todaysAppts = sortedData.filter(appt => appt.date === today);
         setTodayAppointments(todaysAppts);
 
-        // Calculate total unique customers
-        const uniqueCustomers = new Set(bookingsData.map(appt => appt.userEmail || appt.memberId)).size;
-        setTotalCustomers(uniqueCustomers);
+  // Calculate total unique customers (filter out falsy values)
+        const uniqueCustomers = new Set(bookingsData.map(appt => appt.userEmail || appt.memberId || appt.userId).filter(Boolean)).size;
+          setTotalCustomers(uniqueCustomers);
 
-        // Get reviews for this employee
+  // ดึงรีวิวสำหรับพนักงานคนนี้
         // ดึงรีวิวที่ employeeId ตรงกับ user.uid (ซึ่งตอนนี้ employeeId จะเป็น uid ของพนักงานเสมอ)
         const reviewsQuery = query(
           collection(db, 'Reviews'),
@@ -239,10 +383,10 @@ function DashboardEmployee() {
           orderBy('createdAt', 'desc')
         );
         const reviewsSnapshot = await getDocs(reviewsQuery);
-        const reviewData = reviewsSnapshot.docs.map(doc => {
-          const data = doc.data();
+        const reviewData = reviewsSnapshot.docs.map(revDoc => {
+          const data = revDoc.data();
           return {
-            id: doc.id,
+            id: revDoc.id,
             customerName: data.customerName || data.userEmail || 'ลูกค้า',
             rating: data.rating || 5,
             comment: data.comment || data.review || '',
@@ -271,7 +415,14 @@ function DashboardEmployee() {
       }
     };
 
+
     fetchData();
+
+    // --- รีเฟรชข้อมูลอัตโนมัติ ---
+    const interval = setInterval(() => {
+      fetchData();
+    }, 90000); // 90 วินาที
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, currentWeekStart, currentMonth, currentYear]);
 
@@ -280,7 +431,7 @@ function DashboardEmployee() {
     const weekData = [];
     const days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
     
-    // Get Monday of current week
+  // หาวันจันทร์ของสัปดาห์ปัจจุบัน
     const monday = new Date(currentWeekStart);
     monday.setDate(monday.getDate() - monday.getDay() + 1);
     
@@ -340,7 +491,7 @@ function DashboardEmployee() {
   // Fetch employee reviews
   const fetchEmployeeReviews = useCallback(async (bookingsData = appointments) => {
     try {
-      // Get reviews from completed appointments
+  // ดึงรีวิวจากการจองที่เสร็จสิ้น
       const completedAppointments = bookingsData.filter(appt => 
         appt.status === 'เสร็จสิ้น' && (appt.rating || appt.review)
       );
@@ -520,7 +671,7 @@ function DashboardEmployee() {
         console.log('Setting completed status with data:', updateData);
       }
 
-      const bookingRef = doc(db, 'Bookings', bookingId);
+      const bookingRef = firestoreDoc(db, 'Bookings', bookingId);
       await updateDoc(bookingRef, updateData);
       
       // บันทึก log เพื่อตรวจสอบ
@@ -1167,9 +1318,9 @@ function DashboardEmployee() {
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            display: 'flex';
-            align-items: 'center';
-            justify-content: 'center';
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: all 0.3s ease;
           }
           
@@ -1177,6 +1328,13 @@ function DashboardEmployee() {
             background: #ff7730;
             color: white;
             transform: scale(1.1);
+          }
+
+          /* Modal card header style for selected appointment modal */
+          .modal-card-header {
+            background: linear-gradient(135deg, #3b2208 0%, #2b1706 100%); /* dark brown */
+            color: #ffffff !important; /* white text */
+            border-bottom: 3px solid #ff7730;
           }
         `}
       </style>
@@ -1218,6 +1376,7 @@ function DashboardEmployee() {
                     marginTop: 2,
                     boxShadow: '0 2px 8px rgba(44,44,44,0.10)'
                   }}
+                  onClick={() => navigate('/employee/EmployeeProfile')}
                 >
                   <i className="fas fa-user-cog me-2"></i>
                   ตั้งค่าโปรไฟล์
@@ -1307,7 +1466,7 @@ function DashboardEmployee() {
                   <div className="profile-details">
                     <div className="detail-item">
                       <i className="fas fa-phone"></i>
-                      <span>{employeeData?.phone || 'ไม่ระบุเบอร์โทร'}</span>
+                      <span>{employeePhone || employeeData?.phone || 'ไม่ระบุเบอร์โทร'}</span>
                     </div>
                     <div className="detail-item">
                       <i className="fas fa-star"></i>
@@ -1399,7 +1558,7 @@ function DashboardEmployee() {
                         <th className="py-3 px-4 fw-bold" style={{ width: '25%', color: '#ff7730' }}>เวลาทำงาน</th>
                         <th className="py-3 px-4 fw-bold" style={{ width: '25%', color: '#ff7730' }}>การจองลูกค้า</th>
                         <th className="py-3 px-4 fw-bold" style={{ width: '15%', color: '#ff7730' }}>สถานะ</th>
-                        <th className="py-3 px-4 fw-bold" style={{ width: '11%', color: '#ff7730' }}>การดำเนินการ</th>
+                        {/* คอลัมน์การดำเนินการ ถูกนำออกตามคำขอ */}
                       </tr>
                     </thead>
                     <tbody>
@@ -1478,24 +1637,7 @@ function DashboardEmployee() {
                                 }}>หยุด</span>
                               )}
                             </td>
-                            <td className="py-3 px-4">
-                              {day.schedules.length > 0 && (
-                                <button 
-                                  className="btn btn-sm"
-                                  style={{ 
-                                    background: 'linear-gradient(135deg, #ff9900 0%, #ff7730 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '20px',
-                                    padding: '6px 12px',
-                                    fontSize: '12px'
-                                  }}
-                                  title="ดูรายละเอียด"
-                                >
-                                  <i className="fas fa-eye"></i>
-                                </button>
-                              )}
-                            </td>
+                            {/* คอลัมน์การดำเนินการ ถูกนำออกตามคำขอ */}
                           </tr>
                         );
                       })}
@@ -1618,7 +1760,7 @@ function DashboardEmployee() {
                               <h6 className="mb-1 fw-bold">{booking.customerName || 'ลูกค้า'}</h6>
                               <small className="text-muted">
                                 <i className="fas fa-id-card me-1"></i>
-                                {booking.memberId ? `ID: ${booking.memberId.substring(0, 8)}...` : 'ไม่มีข้อมูล'}
+                                { (booking.memberId || booking.userId || booking.userEmail) ? `ID: ${((booking.memberId || booking.userId || booking.userEmail).toString()).substring(0, 12)}...` : 'ไม่มีข้อมูล' }
                               </small>
                             </div>
                           </div>
@@ -1628,21 +1770,22 @@ function DashboardEmployee() {
                         <div className="mb-3">
                           <div className="d-flex align-items-center mb-2">
                             <i className="fas fa-spa me-2" style={{ color: '#28a745', width: '25px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}></i>
-                            <span className="fw-bold text-success">{booking.service || booking.serviceName || 'บริการสปา'}</span>
+                            <span className="fw-bold text-success">{booking.service || booking.serviceName || booking.serviceType || booking.service?.name || booking.service?.title || booking.serviceName?.name || 'บริการสปา'}</span>
                           </div>
                           <div className="d-flex align-items-center mb-2">
                             <i className="fas fa-calendar me-2" style={{ color: '#ff7730', width: '25px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}></i>
                             <span className="text-dark">{(() => {
                               try {
-                                const dateField = getBookingDate(booking);
-                                if (dateField && typeof dateField.toDate === 'function') {
-                                  return new Date(dateField.toDate()).toLocaleDateString('th-TH');
-                                } else if (dateField instanceof Date) {
-                                  return dateField.toLocaleDateString('th-TH');
-                                } else if (dateField && typeof dateField === 'string') {
-                                  return new Date(dateField).toLocaleDateString('th-TH');
+                                // Prefer normalized booking.date (ISO yyyy-mm-dd) then fallback
+                                const preferred = booking.date || getBookingDate(booking);
+                                if (preferred && typeof preferred.toDate === 'function') {
+                                  return new Date(preferred.toDate()).toLocaleDateString('th-TH');
+                                } else if (preferred instanceof Date) {
+                                  return preferred.toLocaleDateString('th-TH');
+                                } else if (typeof preferred === 'string' && preferred) {
+                                  return new Date(preferred).toLocaleDateString('th-TH');
                                 } else {
-                                  return booking.date || 'ไม่ระบุวันที่';
+                                  return 'ไม่ระบุวันที่';
                                 }
                               } catch (error) {
                                 console.error('Error formatting date:', error);
@@ -1851,24 +1994,7 @@ function DashboardEmployee() {
                           </p>
                         </div>
                         
-                        {/* ลิงก์ไปยังการจองที่มีรีวิว (ถ้ามี ID) */}
-                        {review.id && review.id !== '1' && review.id !== '2' && review.id !== '3' && (
-                          <div className="text-end">
-                            <button 
-                              className="btn btn-sm btn-link" 
-                              onClick={() => {
-                                // ค้นหาการจองที่เกี่ยวข้องกับรีวิวนี้
-                                const relatedBooking = appointments.find(appt => appt.id === review.id);
-                                if (relatedBooking) {
-                                  alert(`รหัสการจอง: ${relatedBooking.id}\nวันที่: ${relatedBooking.date}\nบริการ: ${relatedBooking.service}`);
-                                }
-                              }}
-                            >
-                              <i className="fas fa-external-link-alt me-1"></i>
-                              ดูรายละเอียดการจอง
-                            </button>
-                          </div>
-                        )}
+                        {/* ปุ่มลิงก์ไปยังการจอง ถูกนำออกตามคำขอ */}
                       </div>
                     </div>
                   ))}
@@ -1884,7 +2010,7 @@ function DashboardEmployee() {
         <div 
           className="modal show d-block" 
           tabIndex="-1" 
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          style={{ backgroundColor: 'rgba(74, 31, 1, 0.5)' }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setSelectedAppointment(null);
@@ -1894,14 +2020,14 @@ function DashboardEmployee() {
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content" style={{ borderRadius: '15px', border: 'none' }}>
               <div className="modal-header" style={{ 
-                background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', 
+                background: 'linear-gradient(135deg, #542e00ff 0%, #1a1a1a 100%)', 
                 color: 'white',
                 borderTopLeftRadius: '15px',
                 borderTopRightRadius: '15px',
                 borderBottom: '3px solid #ff7730'
               }}>
                 <h5 className="modal-title">
-                  <i className="fas fa-calendar-check me-2" style={{ color: '#ff7730' }}></i>
+                  <i className="fas fa-calendar-check me-2" style={{ color: '#ffffffff' }}></i>
                   รายละเอียดการจอง
                 </h5>
                 <button 
@@ -1911,13 +2037,58 @@ function DashboardEmployee() {
                 ></button>
               </div>
               <div className="modal-body p-4">
+                {/* Preview card: show the same compact appointment card inside the modal */}
+                <div className="mb-4">
+                  <div className="stats-card h-100" style={{ border: '1px solid #e9ecef', padding: '1rem' }}>
+                    <div className="d-flex justify-content-between align-items-start mb-3">
+                      <div className="d-flex align-items-center">
+                        <div 
+                          className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                          style={{ 
+                            width: '45px', 
+                            height: '45px', 
+                            background: 'linear-gradient(135deg, #ff9900 0%, #ff7730 100%)',
+                            color: 'white',
+                            fontSize: '1.1rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          {selectedAppointment.customerName ? selectedAppointment.customerName.charAt(0).toUpperCase() : 'C'}
+                        </div>
+                        <div>
+                          <h6 className="mb-1 fw-bold" style={{ marginBottom: 0 }}>{selectedAppointment.customerName || 'ลูกค้า'}</h6>
+                          <small className="text-muted">{ (selectedAppointment.memberId || selectedAppointment.userId || selectedAppointment.userEmail) ? `ID: ${((selectedAppointment.memberId || selectedAppointment.userId || selectedAppointment.userEmail).toString()).substring(0, 12)}...` : 'ไม่มีข้อมูล' }</small>
+                        </div>
+                      </div>
+                      <div>
+                        {getStatusBadge(selectedAppointment.status)}
+                      </div>
+                    </div>
+
+                    <div className="mb-2">
+                      <div className="d-flex align-items-center mb-2">
+                        <i className="fas fa-spa me-2" style={{ color: '#28a745', width: '25px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}></i>
+                        <span className="fw-bold text-success">{selectedAppointment.serviceName || selectedAppointment.service || selectedAppointment.serviceType || 'บริการสปา'}</span>
+                      </div>
+                      <div className="d-flex align-items-center mb-2">
+                        <i className="fas fa-calendar me-2" style={{ color: '#ff7730', width: '25px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}></i>
+                        <span className="text-dark">{selectedAppointment.date || 'ไม่ระบุวันที่'}</span>
+                      </div>
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-clock me-2" style={{ color: '#ff7730', width: '25px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}></i>
+                        <span className="text-dark">{selectedAppointment.time || selectedAppointment.bookingTime || 'ไม่ระบุเวลา'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="row g-4">
                   {/* ข้อมูลลูกค้า */}
                   <div className="col-md-6">
                     <div className="card h-100" style={{ border: '1px solid #e9ecef', borderRadius: '10px' }}>
-                      <div className="card-header bg-light">
+                      <div className="card-header modal-card-header">
                         <h6 className="mb-0">
-                          <i className="fas fa-user me-2" style={{ color: '#ff7730' }}></i>
+                          <i className="fas fa-user me-2" style={{ color: '#ffffffff' }}></i>
                           ข้อมูลลูกค้า
                         </h6>
                       </div>
@@ -1939,7 +2110,7 @@ function DashboardEmployee() {
                           <div>
                             <h6 className="mb-1 fw-bold">{selectedAppointment.customerName || 'ลูกค้า'}</h6>
                             <small className="text-muted">
-                              ID: {selectedAppointment.memberId ? selectedAppointment.memberId.substring(0, 12) : 'ไม่มีข้อมูล'}
+                              ID: {(selectedAppointment.memberId || selectedAppointment.userId || selectedAppointment.userEmail) ? ((selectedAppointment.memberId || selectedAppointment.userId || selectedAppointment.userEmail).toString()).substring(0, 20) : 'ไม่มีข้อมูล'}
                             </small>
                           </div>
                         </div>
@@ -1950,31 +2121,31 @@ function DashboardEmployee() {
                   {/* ข้อมูลการจอง */}
                   <div className="col-md-6">
                     <div className="card h-100" style={{ border: '1px solid #e9ecef', borderRadius: '10px' }}>
-                      <div className="card-header bg-light">
+                      <div className="card-header modal-card-header">
                         <h6 className="mb-0">
-                          <i className="fas fa-spa me-2" style={{ color: '#ff7730' }}></i>
+                          <i className="fas fa-spa me-2" style={{ color: '#ffffffff' }}></i>
                           ข้อมูลบริการ
                         </h6>
                       </div>
                       <div className="card-body">
                         <div className="mb-3">
                           <label className="form-label text-muted">บริการ</label>
-                          <p className="fw-bold text-success mb-2">{selectedAppointment.service || selectedAppointment.serviceName || 'บริการสปา'}</p>
+                          <p className="fw-bold text-success mb-2">{selectedAppointment.service || selectedAppointment.serviceName || selectedAppointment.serviceType || selectedAppointment.service?.name || selectedAppointment.service?.title || 'บริการสปา'}</p>
                         </div>
                         <div className="row g-3">
                           <div className="col-6">
                             <label className="form-label text-muted">วันที่</label>
                             <p className="mb-2">{(() => {
                               try {
-                                const dateField = getBookingDate(selectedAppointment);
-                                if (dateField && typeof dateField.toDate === 'function') {
-                                  return new Date(dateField.toDate()).toLocaleDateString('th-TH');
-                                } else if (dateField instanceof Date) {
-                                  return dateField.toLocaleDateString('th-TH');
-                                } else if (dateField && typeof dateField === 'string') {
-                                  return new Date(dateField).toLocaleDateString('th-TH');
+                                const preferred = selectedAppointment.date || getBookingDate(selectedAppointment);
+                                if (preferred && typeof preferred.toDate === 'function') {
+                                  return new Date(preferred.toDate()).toLocaleDateString('th-TH');
+                                } else if (preferred instanceof Date) {
+                                  return preferred.toLocaleDateString('th-TH');
+                                } else if (typeof preferred === 'string' && preferred) {
+                                  return new Date(preferred).toLocaleDateString('th-TH');
                                 } else {
-                                  return selectedAppointment.date || 'ไม่ระบุ';
+                                  return 'ไม่ระบุ';
                                 }
                               } catch (error) {
                                 console.error('Error formatting date:', error);
@@ -2002,9 +2173,9 @@ function DashboardEmployee() {
                   {/* สถานะและการชำระเงิน */}
                   <div className="col-12">
                     <div className="card" style={{ border: '1px solid #e9ecef', borderRadius: '10px' }}>
-                      <div className="card-header bg-light">
+                      <div className="card-header modal-card-header">
                         <h6 className="mb-0">
-                          <i className="fas fa-info-circle me-2" style={{ color: '#ff7730' }}></i>
+                          <i className="fas fa-info-circle me-2" style={{ color: '#ffffffff' }}></i>
                           สถานะและข้อมูลเพิ่มเติม
                         </h6>
                       </div>

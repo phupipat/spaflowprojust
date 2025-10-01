@@ -175,7 +175,7 @@ const About = () => {
                        border: 'none',
                        borderRadius: '50px'
                      }}>
-                    <i className="fas fa-paper-plane me-2"></i> ติดต่อเรา
+                    <i className="fas fa-paper-plane me-2" style={{ color: '#fff' }}></i> ติดต่อเรา
                   </a>
                 </div>
               </div>

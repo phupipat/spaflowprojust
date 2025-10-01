@@ -25,12 +25,15 @@
 /* Month Calendar Styles */
 .month-calendar {
   table-layout: fixed;
+  width: 100%;
+  min-width: 1000px; /* เพิ่มความกว้างขั้นต่ำ */
 }
 
 .month-calendar .calendar-cell {
   border: 1px solid #dee2e6;
   padding: 0;
   position: relative;
+  min-width: 120px; /* ความกว้างขั้นต่ำของแต่ละช่อง */
 }
 
 .month-calendar .calendar-cell.today {
@@ -77,20 +80,82 @@
 }
 
 .staff-entries {
-  max-height: 80px;
+  max-height: 85px;
   overflow: hidden;
+  overflow-y: auto;
+}
+
+/* ปุ่มดูรายละเอียดในปฏิทิน */
+.view-details-btn {
+  padding: 2px 5px;
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-details-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* แสดงภาพรวมเวลาทำงานในแต่ละวัน */
+.time-overview {
+  margin-bottom: 8px;
+  padding: 4px;
+  background-color: rgba(0,0,0,0.02);
+  border-radius: 4px;
+  width: 100%; /* ให้ใช้ความกว้างเต็ม cell */
+}
+
+.time-period {
+  display: flex;
+  align-items: center;
+  margin-bottom: 3px;
+  position: relative;
+}
+
+.time-period:hover .progress-bar:after {
+  content: attr(title);
+  position: absolute;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.time-label {
+  min-width: 28px;
+  font-weight: 500;
+}
+
+.staff-count {
+  min-width: 15px;
+  text-align: right;
+  font-weight: 500;
+}
+
+.time-range {
+  color: #555;
 }
 
 /* Staff day entry styles for daily view */
 .staff-day-entry {
   transition: all var(--transition-fast);
   border: 1px solid transparent;
+  margin-bottom: 3px;
 }
 
 .staff-day-entry:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
   border-color: rgba(0, 0, 0, 0.1);
+  cursor: pointer;
 }
 
 /* Day cell hover effect */
@@ -145,6 +210,54 @@ input[type="time"].form-control {
   padding-right: 0.5rem;
 }
 
+/* ภาพรวมช่วงเวลาทำงาน */
+.time-slots-overview .card {
+  transition: all var(--transition-fast);
+  border-radius: var(--border-radius-md);
+}
+
+.time-slots-overview .card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* สีตามช่วงเวลา */
+.bg-warning {
+  background-color: #ff9900 !important;
+}
+
+.bg-info {
+  background-color: #17a2b8 !important;
+}
+
+.bg-primary {
+  background-color: #0d6efd !important;
+}
+
+.bg-warning-subtle {
+  background-color: rgba(255, 193, 7, 0.15);
+}
+
+.bg-info-subtle {
+  background-color: rgba(13, 202, 240, 0.15);
+}
+
+.bg-primary-subtle {
+  background-color: rgba(13, 110, 253, 0.15);
+}
+
+.text-warning {
+  color: #ff9900 !important;
+}
+
+.text-info {
+  color: #17a2b8 !important;
+}
+
+.text-primary {
+  color: #0d6efd !important;
+}
+
 /* Calendar day styles */
 .calendar-day {
   display: flex;
@@ -186,4 +299,21 @@ input[type="time"].form-control {
   .schedule-table {
     min-width: 900px;
   }
+
+  .time-overview {
+    padding: 2px;
+  }
+
+  .time-label, .time-range {
+    font-size: 0.6rem !important;
+  }
+  
+  .month-calendar {
+    min-width: 800px;
+  }
+}
+
+/* Adjust responsive behavior for the calendar */
+.table-responsive {
+  overflow-x: auto;
 }

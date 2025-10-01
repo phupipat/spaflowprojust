@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../Firebase';
-import { collection, query, where, getDocs, getDoc, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, addDoc, increment } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { FaStar, FaGift, FaArrowLeft, FaTicketAlt, FaClock } from 'react-icons/fa';
 import '../../styles/SharedStyles.css';
@@ -32,8 +32,26 @@ function MemberRewards() {
         const userRef = doc(db, 'artifacts/login-spa-7921d/users', user.uid);
         const userDoc = await getDoc(userRef);
         const userData = userDoc.exists() ? userDoc.data() : null;
-        setPoints(userData?.points || 0);
         setUserName(userData?.fullname || userData?.name || user.email.split('@')[0]);
+
+        // คำนวณแต้มจาก PointHistory เหมือนกับ DashboardMember
+        const phQuery = query(collection(db, 'PointHistory'), where('userId', '==', user.uid));
+        const phSnap = await getDocs(phQuery);
+        const phList = phSnap.docs.map(doc => doc.data());
+        
+        // รวมแต้มสะสมจริงจาก PointHistory (แต้มที่ได้รับ - แต้มที่ใช้)
+        const totalPoints = phList.reduce((sum, h) => {
+          // ประเภท transaction ที่เป็นการเพิ่มแต้ม
+          const isEarn = h.type === 'EARN' || h.type === 'earned' || h.type === 'add' || h.type === 'ADD' || h.type === 'REVIEW' || h.type === 'เพิ่มแต้ม';
+          // ประเภท transaction ที่เป็นการใช้/แลกแต้ม
+          const isUse = h.type === 'USE' || h.type === 'subtract' || h.type === 'SUBTRACT' || h.type === 'redeem' || h.type === 'แลกแต้ม';
+          // ใช้ฟิลด์ `points` เท่านั้น
+          const value = Number(h.points) || 0;
+          if (isEarn) return sum + value;
+          if (isUse) return sum - value;
+          return sum;
+        }, 0);
+        setPoints(totalPoints);
 
         // ดึงรายการโปรโมชั่นจาก Rewards
         const rewardsSnapshot = await getDocs(collection(db, 'Rewards'));
@@ -96,6 +114,29 @@ function MemberRewards() {
     setRedemptionError("");
   };
 
+  // เพิ่มฟังก์ชันสำหรับบันทึกแต้มหลังรีวิว
+  const addReviewPoints = async () => {
+    if (!user) return;
+    try {
+      // เพิ่มแต้ม 5 คะแนนให้ user
+      const userRef = doc(db, 'artifacts/login-spa-7921d/users', user.uid);
+      await updateDoc(userRef, {
+        points: increment(5)
+      });
+      // เพิ่มประวัติแต้ม
+      await addDoc(collection(db, 'PointHistory'), {
+        userId: user.uid,
+        points: 5,
+        type: 'REVIEW',
+        reason: 'ได้รับแต้มจากการรีวิวบริการ',
+        createdAt: new Date()
+      });
+      setPoints(prev => prev + 5);
+    } catch (error) {
+      console.error('Error adding review points:', error);
+    }
+  };
+
   const handleRedeemReward = async () => {
     if (!selectedReward) return;
 
@@ -111,7 +152,7 @@ function MemberRewards() {
       // 1. ลดคะแนนสะสมใน /artifacts/login-spa-7921d/users
       const userRef = doc(db, 'artifacts/login-spa-7921d/users', user.uid);
       await updateDoc(userRef, {
-        points: points - selectedReward.pointsCost
+        points: increment(-selectedReward.pointsCost)
       });
 
       // 2. บันทึกการแลกรางวัลใน Redemptions
@@ -133,12 +174,13 @@ function MemberRewards() {
       };
       const redemptionRef = await addDoc(collection(db, 'Redemptions'), redemptionData);
 
-      // 3. เพิ่มประวัติการใช้แต้มใน pointHistory
-      await addDoc(collection(db, 'pointHistory'), {
+      // 3. เพิ่มประวัติการใช้แต้มใน PointHistory
+      await addDoc(collection(db, 'PointHistory'), {
         userId: user.uid,
-        amount: -selectedReward.pointsCost,
-        type: 'redeem',
-        timestamp: new Date(),
+        points: selectedReward.pointsCost,
+        type: 'USE',
+        reason: `แลกรางวัล: ${selectedReward.name}`,
+        createdAt: new Date(),
         rewardId: selectedReward.id
       });
 
@@ -332,7 +374,7 @@ function MemberRewards() {
                     }}
                     disabled={points < reward.pointsCost}
                     style={{
-                      background: points >= reward.pointsCost ? 'linear-gradient(135deg, #3498db, #2980b9)' : '#f1f4f6',
+                      background: points >= reward.pointsCost ? 'linear-gradient(135deg, #7B4019)' : '#f1f4f6',
                       color: points >= reward.pointsCost ? 'white' : '#999',
                       border: 'none',
                       padding: '12px',
@@ -418,24 +460,25 @@ function MemberRewards() {
       {/* โมดัลยืนยันการแลกรางวัล */}
       {showConfirmModal && selectedReward && (
         <div className="modal-backdrop" style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1050
-      }}>
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content" style={{
-            borderRadius: '20px',
-            border: 'none',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
-          }}>
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1050
+        }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content" style={{
+              borderRadius: '20px',
+              border: 'none',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+              overflow: 'hidden',
+              background: '#fff' // สีขาวทึบ
+            }}>
             {redemptionSuccess ? (
                 <div className="modal-body text-center p-5">
                   <div className="success-icon mb-4" style={{
@@ -472,7 +515,7 @@ function MemberRewards() {
               ) : (
                 <>
                   <div className="modal-header" style={{
-                    background: 'linear-gradient(135deg, #3498db, #2980b9)',
+                    background: 'linear-gradient(135deg,  #FF7D29, #7B4019)',
                     border: 'none',
                     padding: '20px'
                   }}>
@@ -584,7 +627,7 @@ function MemberRewards() {
                       onClick={handleRedeemReward}
                       disabled={redeemLoading || points < selectedReward.pointsCost}
                       style={{
-                        background: 'linear-gradient(135deg, #3498db, #2980b9)',
+                        background: 'linear-gradient(135deg, #7B4019)',
                         color: 'white',
                         border: 'none',
                         borderRadius: '12px',

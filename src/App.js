@@ -9,6 +9,7 @@ import DashboardOwner from "./page/owner/DashboardOwner.jsx";
 import OwnerProfile from "./page/owner/OwnerProfile.jsx";
 import OwnerSettings from "./page/owner/OwnerSettings.jsx";
 import DashboardEmployee from "./page/employee/DashboardEmployee.jsx";
+import EmployeeProfile from "./page/employee/EmployeeProfile.jsx";
 import DashboardMember from "./page/member/DashboardMember.jsx"; // สำหรับ Member
 import CustomerServices from "./page/member/CustomerServices.jsx"; // สำหรับ Member จองบริการ
 import MemberRewards from "./page/member/MemberRewards.jsx"; // สำหรับ Member แลกรางวัล
@@ -18,6 +19,7 @@ import Home from "./components/Home.jsx";
 import About from "./components/About.jsx"; 
 import Contact from './components/Contact';
 import Unauthorized from './components/Unauthorized';
+import Profile from './page/member/MemberProfile.jsx';
 
 function App() {
   return (
@@ -79,6 +81,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/employee/EmployeeProfile"
+            element={
+              <ProtectedRoute allowRoles={["Employee"]}>
+                <EmployeeProfile />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Customer (Member) */}
           <Route
@@ -94,6 +104,14 @@ function App() {
             element={
               <ProtectedRoute allowRoles={["Member"]}>
                 <DashboardMember />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/member/profile"
+            element={
+              <ProtectedRoute allowRoles={["Member"]}>
+                <Profile />
               </ProtectedRoute>
             }
           />

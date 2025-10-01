@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, where } from 'firebase/firestore';
 import { db } from '../../Firebase';
 import '../../styles/SharedStyles.css';
+import * as XLSX from 'xlsx';
 
 const PaymentReport = () => {
   const [bookings, setBookings] = useState([]);
@@ -11,6 +12,7 @@ const PaymentReport = () => {
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterPaymentStatus, setFilterPaymentStatus] = useState('');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     // Set default date range to current month
@@ -41,13 +43,46 @@ const PaymentReport = () => {
           console.log(`Found ${paymentsSnap.size} payment records`);
           paymentsSnap.docs.forEach(doc => {
             const paymentData = doc.data();
+            console.log('Payment record:', JSON.stringify({
+              id: doc.id,
+              bookingId: paymentData.bookingId,
+              bookingIds: paymentData.bookingIds,
+              paymentMethod: paymentData.paymentMethod,
+              amount: paymentData.amount || paymentData.totalAmount,
+              paymentStatus: paymentData.paymentStatus
+            }, null, 2));
+            
+            const paymentInfo = {
+              id: doc.id,
+              ...paymentData,
+              paymentSource: 'Payments'
+            };
+            
+            // รองรับทั้ง bookingId (string) และ bookingIds (array)
             if (paymentData.bookingId) {
-              paymentsMap[paymentData.bookingId] = {
-                id: doc.id,
-                ...paymentData,
-                paymentSource: 'Payments'
-              };
+              paymentsMap[paymentData.bookingId] = paymentInfo;
             }
+            
+            // รองรับ bookingIds (array) - แม็ปแต่ละ bookingId ในอาร์เรย์
+            if (Array.isArray(paymentData.bookingIds) && paymentData.bookingIds.length > 0) {
+              paymentData.bookingIds.forEach(bid => {
+                if (bid) {
+                  paymentsMap[bid] = paymentInfo;
+                }
+              });
+            }
+          });
+          
+          console.log('Final paymentsMap keys:', Object.keys(paymentsMap));
+          console.log('Sample paymentsMap values:');
+          Object.keys(paymentsMap).slice(0, 3).forEach(key => {
+            console.log(`  ${key}:`, JSON.stringify({
+              paymentMethod: paymentsMap[key].paymentMethod,
+              paymentStatus: paymentsMap[key].paymentStatus,
+              totalAmount: paymentsMap[key].totalAmount || paymentsMap[key].amount,
+              bookingIds: paymentsMap[key].bookingIds,
+              bookingId: paymentsMap[key].bookingId
+            }, null, 2));
           });
         }
       } catch (error) {
@@ -110,6 +145,30 @@ const PaymentReport = () => {
           booking.paymentMethod = paymentInfo.paymentMethod || booking.paymentMethod;
           booking.totalAmount = paymentInfo.amount || paymentInfo.totalAmount || booking.totalAmount || booking.price;
           booking.paidAt = paymentInfo.paidAt || paymentInfo.paymentDate || booking.paidAt;
+          
+          // Debug: แสดงข้อมูลการแม็ป (สำหรับ 3 รายการแรก)
+          if (bookingsData.length < 3) {
+            console.log('PaymentReport booking mapping:', JSON.stringify({
+              bookingId: booking.id,
+              originalPaymentMethod: booking.paymentMethod,
+              paymentsPaymentMethod: paymentInfo.paymentMethod,
+              finalPaymentMethod: booking.paymentDetails?.paymentMethod,
+              paymentSource: 'Payments',
+              paymentStatus: paymentInfo.paymentStatus,
+              amount: paymentInfo.amount || paymentInfo.totalAmount
+            }, null, 2));
+          }
+        } else {
+          // Debug: แสดงกรณีที่ไม่พบข้อมูลใน Payments
+          if (bookingsData.length < 3) {
+            console.log('PaymentReport booking without payment mapping:', JSON.stringify({
+              bookingId: booking.id,
+              bookingPaymentMethod: booking.paymentMethod,
+              paymentSource: 'Bookings only',
+              totalAmount: booking.totalAmount || booking.price,
+              paymentStatus: booking.paymentStatus
+            }, null, 2));
+          }
         }
         
         // Fetch customer details if needed
@@ -260,17 +319,46 @@ const PaymentReport = () => {
       summary.totalAmount += amount;
       
       // ตรวจสอบวิธีการชำระเงิน - ให้ความสำคัญกับข้อมูลจาก Payments collection
-      const paymentMethod = booking.paymentDetails?.paymentMethod || booking.paymentMethod || 'cash';
+      const rawPaymentMethod = booking.paymentDetails?.paymentMethod || booking.paymentMethod || '';
       
-      if (paymentMethod === 'cash') {
+      // Normalize payment method เหมือนใน DashboardOwner
+      let normalizedPaymentMethod = 'cash'; // default fallback
+      if (rawPaymentMethod) {
+        const methodLower = rawPaymentMethod.toString().toLowerCase();
+        if (methodLower.includes('credit') || methodLower.includes('card') || methodLower.includes('visa') || methodLower.includes('master')) {
+          normalizedPaymentMethod = 'credit';
+        } else if (methodLower.includes('transfer') || methodLower.includes('bank') || methodLower.includes('promptpay') || methodLower.includes('qr') || methodLower.includes('banking')) {
+          normalizedPaymentMethod = 'transfer';
+        } else if (methodLower.includes('cash') || methodLower === 'cash') {
+          normalizedPaymentMethod = 'cash';
+        } else if (['credit', 'transfer', 'cash'].includes(methodLower)) {
+          normalizedPaymentMethod = methodLower;
+        } else {
+          // ถ้าไม่รู้จัก ให้เก็บไว้เป็น other แต่ยังนับเป็น cash ใน summary เดิม (เพื่อไม่ให้ UI เสีย)
+          console.log('Unknown payment method in PaymentReport summary:', rawPaymentMethod, 'for booking', booking.id);
+          normalizedPaymentMethod = 'cash'; // fallback
+        }
+      }
+      
+      // Debug: แสดงการแม็ป payment method (สำหรับ 5 รายการแรก)
+      if (bookings.indexOf(booking) < 5) {
+        console.log('PaymentReport summary mapping booking', booking.id, ':', JSON.stringify({
+          bookingId: booking.id,
+          rawMethod: rawPaymentMethod,
+          normalized: normalizedPaymentMethod,
+          source: booking.paymentDetails ? 'Payments' : 'Bookings',
+          amount: amount,
+          paymentDetailsExists: !!booking.paymentDetails,
+          paymentDetailsMethod: booking.paymentDetails?.paymentMethod
+        }, null, 2));
+      }
+      
+      if (normalizedPaymentMethod === 'cash') {
         summary.totalCash += amount;
-      } else if (paymentMethod === 'transfer') {
+      } else if (normalizedPaymentMethod === 'transfer') {
         summary.totalTransfer += amount;
-      } else if (paymentMethod === 'credit') {
+      } else if (normalizedPaymentMethod === 'credit') {
         summary.totalCreditCard += amount;
-      } else {
-        // ถ้าเป็นวิธีอื่นๆ ให้นับเป็นเงินสดเป็นค่าเริ่มต้น
-        summary.totalCash += amount;
       }
       
       // ตรวจสอบสถานะการชำระเงิน
@@ -320,18 +408,236 @@ const PaymentReport = () => {
     return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(Number(amount) || 0);
   };
 
+  // Export payment report to Excel
+  const exportPaymentReportToExcel = () => {
+    try {
+      setExporting(true);
+      
+      // ข้อมูลสำหรับรายงานการชำระเงิน
+      const paymentReportData = bookings.map(booking => {
+        // Determine date object
+        let bookingDate;
+        if (booking.bookingDate && typeof booking.bookingDate.toDate === 'function') {
+          bookingDate = booking.bookingDate.toDate();
+        } else if (booking.date && typeof booking.date === 'string') {
+          bookingDate = new Date(booking.date);
+        } else if (booking.date && typeof booking.date.toDate === 'function') {
+          bookingDate = booking.date.toDate();
+        } else {
+          bookingDate = new Date();
+        }
+
+        // Determine times
+        let startTime;
+        if (booking.startTime && typeof booking.startTime.toDate === 'function') {
+          startTime = booking.startTime.toDate();
+        } else if (booking.bookingTime && typeof booking.bookingTime.toDate === 'function') {
+          startTime = booking.bookingTime.toDate();
+        } else if (booking.time) {
+          startTime = booking.time;
+        } else if (booking.bookingTime && typeof booking.bookingTime === 'string') {
+          startTime = booking.bookingTime;
+        } else if (booking.appointmentTime) {
+          startTime = booking.appointmentTime;
+        } else if (booking.serviceTime) {
+          startTime = booking.serviceTime;
+        }
+
+        // ข้อมูลเพิ่มเติมสำหรับการแสดงผล
+        let paymentSource = booking.paymentDetails ? 'Payments' : 'Bookings';
+        let paymentDate = null;
+        
+        if (booking.paymentDetails?.paidAt) {
+          paymentDate = booking.paymentDetails.paidAt;
+        } else if (booking.paidAt) {
+          paymentDate = booking.paidAt;
+        }
+
+        // การตรวจสอบสถานะการชำระเงิน
+        const isPaid = booking.paymentStatus === 'ชำระเงินแล้ว' || 
+                       booking.paymentDetails?.paymentStatus === 'ชำระเงินแล้ว' || 
+                       booking.payment?.method === 'completed';
+        const paymentStatusText = isPaid ? 'ชำระเงินแล้ว' : 'รอชำระเงิน';
+
+        // ตรวจสอบวิธีการชำระเงิน
+        const rawPaymentMethod = booking.paymentDetails?.paymentMethod || booking.paymentMethod || '';
+        let paymentMethodText = 'ไม่ระบุ';
+        
+        // แปลงวิธีการชำระเงินให้เป็นข้อความภาษาไทย
+        if (rawPaymentMethod) {
+          const methodLower = rawPaymentMethod.toString().toLowerCase();
+          if (methodLower.includes('credit') || methodLower.includes('card') || methodLower === 'credit') {
+            paymentMethodText = 'บัตรเครดิต';
+          } else if (methodLower.includes('transfer') || methodLower.includes('bank') || methodLower.includes('promptpay') || methodLower === 'transfer') {
+            paymentMethodText = 'โอนเงิน';
+          } else if (methodLower.includes('cash') || methodLower === 'cash') {
+            paymentMethodText = 'เงินสด';
+          } else {
+            paymentMethodText = rawPaymentMethod;
+          }
+        }
+
+        // ตรวจสอบข้อมูลลูกค้า
+        const customerName = booking.customerDetails?.fullName
+          || booking.customerDetails?.displayName
+          || booking.customerDetails?.name
+          || booking.fullName
+          || booking.displayName
+          || booking.name
+          || booking.customerDetails?.email
+          || booking.userEmail
+          || booking.customerEmail
+          || `ลูกค้า (${booking.id.substring(0, 6)})`;
+        
+        const customerEmail = booking.customerDetails?.email || booking.userEmail || booking.customerEmail || '-';
+        const customerPhone = booking.customerDetails?.phone || booking.customerDetails?.phoneNumber || booking.phone || '-';
+        
+        // ตรวจสอบข้อมูลบริการ
+        const serviceName = booking.service || booking.serviceName || 'บริการทั่วไป';
+        
+        // ตรวจสอบราคา
+        const bookingAmount = booking.paymentDetails?.amount || 
+                             booking.paymentDetails?.totalAmount || 
+                             booking.totalAmount || 
+                             booking.price || 0;
+                             
+        // ข้อมูลใบเสร็จ
+        const receiptInfo = booking.paymentDetails?.transactionId || booking.transactionId || '-';
+
+        // ข้อมูลวันที่ชำระเงิน
+        let formattedPaymentDate = '-';
+        if (paymentDate) {
+          try {
+            let paidDate;
+            if (paymentDate.seconds) {
+              paidDate = new Date(paymentDate.seconds * 1000);
+            } else if (typeof paymentDate === 'string') {
+              paidDate = new Date(paymentDate);
+            } else {
+              paidDate = new Date(paymentDate);
+            }
+            formattedPaymentDate = paidDate.toLocaleDateString('th-TH');
+          } catch (e) {
+            console.error('Error formatting payment date:', e);
+            formattedPaymentDate = '-';
+          }
+        }
+
+        return {
+          'วันที่ใช้บริการ': bookingDate.toLocaleDateString('th-TH'),
+          'เวลา': typeof startTime === 'string' ? startTime : (startTime ? new Date(startTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '-'),
+          'รหัสการจอง': booking.id,
+          'ชื่อลูกค้า': customerName,
+          'อีเมล': customerEmail,
+          'โทรศัพท์': customerPhone,
+          'บริการ': serviceName,
+          'จำนวนเงิน': Number(bookingAmount),
+          'ช่องทางชำระเงิน': paymentMethodText,
+          'สถานะการชำระ': paymentStatusText,
+          'เลขที่ใบเสร็จ': receiptInfo,
+          'วันที่ชำระเงิน': formattedPaymentDate,
+          'แหล่งข้อมูล': paymentSource
+        };
+      });
+
+      // สร้างข้อมูลสรุป
+      const summary = calculateSummary();
+      const summaryData = [
+        { 'สรุปข้อมูล': 'รายงานการชำระเงิน', 'จำนวน': '', 'มูลค่า': '' },
+        { 'สรุปข้อมูล': `ระหว่างวันที่ ${formatDate(new Date(startDate))} - ${formatDate(new Date(endDate))}`, 'จำนวน': '', 'มูลค่า': '' },
+        { 'สรุปข้อมูล': '', 'จำนวน': '', 'มูลค่า': '' },
+        { 'สรุปข้อมูล': 'จำนวนรายการทั้งหมด', 'จำนวน': summary.totalBookings, 'มูลค่า': summary.totalAmount },
+        { 'สรุปข้อมูล': 'ชำระเงินแล้ว', 'จำนวน': summary.completedBookings, 'มูลค่า': '' },
+        { 'สรุปข้อมูล': 'รอชำระเงิน', 'จำนวน': summary.pendingBookings, 'มูลค่า': '' },
+        { 'สรุปข้อมูล': '', 'จำนวน': '', 'มูลค่า': '' },
+        { 'สรุปข้อมูล': 'แยกตามวิธีการชำระเงิน', 'จำนวน': '', 'มูลค่า': '' },
+        { 'สรุปข้อมูล': 'เงินสด', 'จำนวน': '', 'มูลค่า': summary.totalCash },
+        { 'สรุปข้อมูล': 'โอนเงิน', 'จำนวน': '', 'มูลค่า': summary.totalTransfer },
+        { 'สรุปข้อมูล': 'บัตรเครดิต', 'จำนวน': '', 'มูลค่า': summary.totalCreditCard },
+      ];
+
+      // สร้าง Workbook
+      const wb = XLSX.utils.book_new();
+      
+      // สร้าง Worksheet สำหรับข้อมูลการชำระเงิน
+      const ws = XLSX.utils.json_to_sheet(paymentReportData);
+      
+      // กำหนดความกว้างของคอลัมน์
+      const wscols = [
+        { wch: 15 }, // วันที่ใช้บริการ
+        { wch: 10 }, // เวลา
+        { wch: 25 }, // รหัสการจอง
+        { wch: 20 }, // ชื่อลูกค้า
+        { wch: 25 }, // อีเมล
+        { wch: 15 }, // โทรศัพท์
+        { wch: 20 }, // บริการ
+        { wch: 12 }, // จำนวนเงิน
+        { wch: 15 }, // ช่องทางชำระเงิน
+        { wch: 15 }, // สถานะการชำระ
+        { wch: 25 }, // เลขที่ใบเสร็จ
+        { wch: 15 }, // วันที่ชำระเงิน
+        { wch: 10 }  // แหล่งข้อมูล
+      ];
+      ws['!cols'] = wscols;
+      
+      // เพิ่ม Worksheet ลงใน Workbook
+      XLSX.utils.book_append_sheet(wb, ws, "รายงานการชำระเงิน");
+      
+      // สร้าง Worksheet สำหรับข้อมูลสรุป
+      const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+      
+      // กำหนดความกว้างของคอลัมน์สำหรับหน้าสรุป
+      const wsSummaryCols = [
+        { wch: 30 }, // สรุปข้อมูล
+        { wch: 15 }, // จำนวน
+        { wch: 15 }  // มูลค่า
+      ];
+      wsSummary['!cols'] = wsSummaryCols;
+      
+      // เพิ่ม Worksheet สรุปลงใน Workbook
+      XLSX.utils.book_append_sheet(wb, wsSummary, "สรุปข้อมูล");
+      
+      // กำหนดชื่อไฟล์
+      const fileName = `รายงานการชำระเงิน_${startDate}_ถึง_${endDate}.xlsx`;
+      
+      // สร้าง Excel file และดาวน์โหลด
+      XLSX.writeFile(wb, fileName);
+      
+      console.log(`Successfully exported payment report to ${fileName}`);
+      
+    } catch (error) {
+      console.error("Error exporting payment report to Excel:", error);
+      alert("เกิดข้อผิดพลาดในการส่งออกรายงาน โปรดลองอีกครั้ง");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="container-fluid p-4 animate-fade-in">
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-header text-white" style={{ backgroundColor: '#7B4019' }}>
+      <div className="card shadow-sm border-0 mb-4" style={{ border: '2px solid #7B4019', borderRadius: '16px' }}>
+        <div className="card-header text-white" style={{ background: 'linear-gradient(90deg, #a86a3d 0%, #7B4019 100%)', color: '#fff', borderTopLeftRadius: '14px', borderTopRightRadius: '14px', borderBottom: '2px solid #7B4019' }}>
           <div className="d-flex justify-content-between align-items-center">
             <h4 className="mb-0">
               <i className="fas fa-cash-register me-2"></i>
               รายงานสถานะการชำระเงิน
             </h4>
             <div>
-              <button className="btn btn-sm btn-light">
-                <i className="fas fa-download me-1"></i> ดาวน์โหลดรายงาน
+              <button 
+                className="btn btn-sm btn-light" 
+                onClick={exportPaymentReportToExcel}
+                disabled={exporting || loading || bookings.length === 0}
+              >
+                {exporting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    กำลังส่งออกข้อมูล...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-download me-1"></i> ดาวน์โหลดรายงาน
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -501,12 +807,20 @@ const PaymentReport = () => {
                         bookingDate = new Date();
                       }
 
-                      // Determine times
+                      // Determine times - รองรับหลายฟิลด์
                       let startTime;
                       if (booking.startTime && typeof booking.startTime.toDate === 'function') {
                         startTime = booking.startTime.toDate();
+                      } else if (booking.bookingTime && typeof booking.bookingTime.toDate === 'function') {
+                        startTime = booking.bookingTime.toDate();
                       } else if (booking.time) {
                         startTime = booking.time;
+                      } else if (booking.bookingTime && typeof booking.bookingTime === 'string') {
+                        startTime = booking.bookingTime;
+                      } else if (booking.appointmentTime) {
+                        startTime = booking.appointmentTime;
+                      } else if (booking.serviceTime) {
+                        startTime = booking.serviceTime;
                       }
 
                       // Determine payment status from either Bookings or Payments collection
@@ -533,22 +847,41 @@ const PaymentReport = () => {
                       // ลำดับการดึงข้อมูล: Payments.paymentMethod > Bookings.paymentMethod
                       const rawPaymentMethod = booking.paymentDetails?.paymentMethod || booking.paymentMethod;
                       
-                      if (rawPaymentMethod === 'cash') {
-                        paymentMethod = 'เงินสด';
-                        paymentMethodIcon = 'money-bill-wave';
-                        paymentMethodClass = 'bg-success-subtle text-success';
-                      } else if (rawPaymentMethod === 'transfer') {
-                        paymentMethod = 'โอนเงิน';
-                        paymentMethodIcon = 'university';
-                        paymentMethodClass = 'bg-primary-subtle text-primary';
-                      } else if (rawPaymentMethod === 'credit') {
-                        paymentMethod = 'บัตรเครดิต';
-                        paymentMethodIcon = 'credit-card';
-                        paymentMethodClass = 'bg-warning-subtle text-warning';
-                      } else if (rawPaymentMethod) {
-                        // ถ้ามีค่าแต่ไม่ตรงกับที่กำหนด ให้แสดงค่าดิบ
-                        paymentMethod = rawPaymentMethod;
-                        paymentMethodClass = 'bg-info-subtle text-info';
+                      // Normalize payment method เหมือนในส่วน calculateSummary
+                      if (rawPaymentMethod) {
+                        const methodLower = rawPaymentMethod.toString().toLowerCase();
+                        if (methodLower.includes('credit') || methodLower.includes('card') || methodLower.includes('visa') || methodLower.includes('master')) {
+                          paymentMethod = 'บัตรเครดิต';
+                          paymentMethodIcon = 'credit-card';
+                          paymentMethodClass = 'bg-warning-subtle text-warning';
+                        } else if (methodLower.includes('transfer') || methodLower.includes('bank') || methodLower.includes('promptpay') || methodLower.includes('qr') || methodLower.includes('banking')) {
+                          paymentMethod = 'โอนเงิน';
+                          paymentMethodIcon = 'university';
+                          paymentMethodClass = 'bg-primary-subtle text-primary';
+                        } else if (methodLower.includes('cash') || methodLower === 'cash') {
+                          paymentMethod = 'เงินสด';
+                          paymentMethodIcon = 'money-bill-wave';
+                          paymentMethodClass = 'bg-success-subtle text-success';
+                        } else if (['credit', 'transfer', 'cash'].includes(methodLower)) {
+                          if (methodLower === 'credit') {
+                            paymentMethod = 'บัตรเครดิต';
+                            paymentMethodIcon = 'credit-card';
+                            paymentMethodClass = 'bg-warning-subtle text-warning';
+                          } else if (methodLower === 'transfer') {
+                            paymentMethod = 'โอนเงิน';
+                            paymentMethodIcon = 'university';
+                            paymentMethodClass = 'bg-primary-subtle text-primary';
+                          } else if (methodLower === 'cash') {
+                            paymentMethod = 'เงินสด';
+                            paymentMethodIcon = 'money-bill-wave';
+                            paymentMethodClass = 'bg-success-subtle text-success';
+                          }
+                        } else {
+                          // ถ้ามีค่าแต่ไม่ตรงกับที่กำหนด ให้แสดงค่าดิบ
+                          paymentMethod = rawPaymentMethod;
+                          paymentMethodClass = 'bg-info-subtle text-info';
+                          console.log('Unknown payment method in table display:', rawPaymentMethod, 'for booking', booking.id);
+                        }
                       }
 
                       // Calculate days ago
@@ -605,17 +938,17 @@ const PaymentReport = () => {
                               </div>
                               <div>
                                 <div>
-                                  {/* ลำดับการแสดงชื่อลูกค้า: fullName > displayName > userName > userEmail > customerName */}
-                                  {booking.customerDetails?.fullName || 
-                                   booking.customerDetails?.displayName || 
-                                   booking.customerDetails?.userName ||
-                                   booking.userName ||
-                                   booking.fullName ||
-                                   booking.customerDetails?.email || 
-                                   booking.userEmail || 
-                                   booking.customerName ||
-                                   booking.customerEmail ||
-                                   `ลูกค้า (${booking.id.substring(0, 6)})`}
+                                  {/* แสดงชื่อเต็มลูกค้า ถ้าไม่มีให้ fallback เป็น email */}
+                                  {booking.customerDetails?.fullName
+                                    || booking.customerDetails?.displayName
+                                    || booking.customerDetails?.name
+                                    || booking.fullName
+                                    || booking.displayName
+                                    || booking.name
+                                    || booking.customerDetails?.email
+                                    || booking.userEmail
+                                    || booking.customerEmail
+                                    || `ลูกค้า (${booking.id.substring(0, 6)})`}
                                 </div>
                                 {/* แสดงอีเมลถ้ามีและไม่ใช่ชื่อหลัก */}
                                 {(booking.customerDetails?.email || booking.userEmail || booking.customerEmail) && 
@@ -925,6 +1258,28 @@ const PaymentReport = () => {
               </div>
             </div>
           </div>
+          
+          {/* คำอธิบายการดาวน์โหลดรายงาน */}
+          {bookings.length > 0 && (
+            <div className="alert alert-info mt-3">
+              <div className="d-flex">
+                <div className="me-3">
+                  <i className="fas fa-info-circle fa-2x"></i>
+                </div>
+                <div>
+                  <h5 className="alert-heading">ข้อมูลการดาวน์โหลดรายงาน</h5>
+                  <p className="mb-0">
+                    คลิกปุ่ม "ดาวน์โหลดรายงาน" ที่ด้านบนของหน้านี้เพื่อบันทึกข้อมูลการชำระเงินในรูปแบบไฟล์ Excel (.xlsx)
+                    ไฟล์รายงานจะประกอบด้วย 2 ชีท ได้แก่:
+                  </p>
+                  <ul className="mb-0 mt-2">
+                    <li>รายงานการชำระเงิน: ข้อมูลรายละเอียดทั้งหมดของการชำระเงินแต่ละรายการ</li>
+                    <li>สรุปข้อมูล: ภาพรวมจำนวนและมูลค่าการชำระเงินแยกตามวิธีการชำระ</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

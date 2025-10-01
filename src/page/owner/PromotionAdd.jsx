@@ -13,12 +13,14 @@ const cardStyles = {
     boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
   },
   discountHeader: {
-    backgroundColor: '#e8f4ff',
-    borderBottom: '2px solid #c5e1ff'
+    background: 'linear-gradient(90deg, #b97b3e 0%, #7B4019 100%)',
+    borderBottom: '2px solid #7B4019',
+    color: '#fff'
   },
   freeServiceHeader: {
-    backgroundColor: '#f0fff0',
-    borderBottom: '2px solid #d0ebd0'
+    background: 'linear-gradient(90deg, #b97b3e 0%, #7B4019 100%)',
+    borderBottom: '2px solid #7B4019',
+    color: '#fff'
   },
   pointsBadge: {
     fontSize: '0.85rem',

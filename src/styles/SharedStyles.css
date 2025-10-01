@@ -1,40 +1,30 @@
 /* SharedStyles.css - Common styles for SpaFlow Web Application */
 
 :root {
-  /* Color Palette */
-  --color-primary: #8B4513;    /* SaddleBrown - primary brand color */
-  --color-primary-light: #A0522D; /* Sienna - lighter shade */
-  --color-primary-dark: #5E2E0F;  /* Darker brown */
-  
-  --color-secondary: #FF8C40;  /* Dark orange - secondary accent */
-  --color-secondary-light: #FFA76A; /* Lighter orange */
-  --color-secondary-dark: #E26C20; /* Darker orange */
-  
-  --color-tertiary: #D2B48C;   /* Tan - tertiary color */
-  
-  --color-success: #4CAF50;    /* Green */
-  --color-warning: #FFC107;    /* Amber */
-  --color-danger: #F44336;     /* Red */
-  --color-info: #2196F3;       /* Blue */
-  
-  --color-text-primary: #333333;
-  --color-text-secondary: #6c757d;
-  --color-text-light: #f8f9fa;
-  
+  /* Updated Color Palette */
+  --color-primary: #7B4019;    /* Updated primary color */
+  --color-primary-light: #FFBF78; /* Updated lighter shade */
+  --color-primary-dark: #FF7D29;  /* Updated darker shade */
+
+  --color-secondary: #FFEEA9;  /* Updated secondary accent */
+  --color-secondary-light: #FFBF78; /* Updated lighter secondary */
+  --color-secondary-dark: #FF7D29; /* Updated darker secondary */
+
+  /* Retain cart and background colors */
   --color-background: #FFFFFF;
   --color-background-light: #F5F5F5;
-  
+
   /* Typography */
   --font-family-primary: 'Prompt', 'Kanit', sans-serif;
   --font-family-secondary: 'Cormorant Garamond', serif;
-  
+
   --font-size-xs: 0.75rem;     /* 12px */
   --font-size-sm: 0.875rem;    /* 14px */
   --font-size-md: 1rem;        /* 16px */
   --font-size-lg: 1.25rem;     /* 20px */
   --font-size-xl: 1.5rem;      /* 24px */
   --font-size-xxl: 2rem;       /* 32px */
-  
+
   /* Spacing */
   --spacing-xs: 0.25rem;       /* 4px */
   --spacing-sm: 0.5rem;        /* 8px */
@@ -42,18 +32,18 @@
   --spacing-lg: 1.5rem;        /* 24px */
   --spacing-xl: 2rem;          /* 32px */
   --spacing-xxl: 3rem;         /* 48px */
-  
+
   /* Borders */
   --border-radius-sm: 0.25rem;  /* 4px */
   --border-radius-md: 0.5rem;   /* 8px */
   --border-radius-lg: 1rem;     /* 16px */
   --border-radius-pill: 50rem;
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-  
+
   /* Transitions */
   --transition-fast: 0.2s ease;
   --transition-normal: 0.3s ease;

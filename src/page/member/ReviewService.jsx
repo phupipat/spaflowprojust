@@ -60,7 +60,7 @@ function ReviewService() {
         let bookingData = { id: bookingDoc.id, ...bookingDoc.data() };
         // ถ้ารีวิวแล้ว (canReview === false) และมี reviewsId ให้ดึงข้อมูลรีวิวจาก Reviews
         let reviewData = null;
-        if (bookingData.canReview === false && bookingData.reviewsId) {
+        if (bookingData.canReview === false && bookingData.reviewsId && bookingData.reviewsId !== "") {
           try {
             const reviewRef = doc(db, 'Reviews', bookingData.reviewsId);
             const reviewDoc = await getDoc(reviewRef);
@@ -148,8 +148,8 @@ function ReviewService() {
             if (employeeDoc && employeeDoc.exists()) {
               const employeeData = employeeDoc.data();
               console.log('Employee data fetched:', employeeData);
-              if (employeeData.role === 'employee' && employeeData.fullName) {
-                bookingData.employeeName = employeeData.fullName;
+              if (employeeData.role === 'employee' && (employeeData.fullName || employeeData.fullname)) {
+                bookingData.employeeName = employeeData.fullName || employeeData.fullname;
               } else {
                 bookingData.employeeName = employeeData.displayName || employeeData.name || 'ไม่ระบุ';
               }
