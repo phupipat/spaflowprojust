@@ -3189,7 +3189,7 @@ function DashboardOwner() {
                                 <div className="btn-group" role="group">
                                   <button 
                                     type="button" 
-                                    className={`btn btn-sm ${chartSettings.viewType === 'daily' ? 'btn-primary' : 'btn-outline-primary'}`}
+                                    className={`btn btn-sm ${chartSettings.viewType === 'daily' ? 'btn-brown' : 'btn-outline-secondary'}`}
                                     onClick={() => setChartSettings(prev => ({ ...prev, viewType: 'daily' }))}
                                   >
                                     <i className="fas fa-calendar-day me-1"></i>
@@ -3197,7 +3197,7 @@ function DashboardOwner() {
                                   </button>
                                   <button 
                                     type="button" 
-                                    className={`btn btn-sm ${chartSettings.viewType === 'monthly' ? 'btn-primary' : 'btn-outline-primary'}`}
+                                    className={`btn btn-sm ${chartSettings.viewType === 'monthly' ? 'btn-brown' : 'btn-outline-secondary'}`}
                                     onClick={() => setChartSettings(prev => ({ ...prev, viewType: 'monthly' }))}
                                   >
                                     <i className="fas fa-calendar-alt me-1"></i>
@@ -3501,7 +3501,7 @@ function DashboardOwner() {
                 <div className="row mb-4">
                   <div className="col-md-6">
                     <div className="card h-100" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
                         <h6 className="mb-0" style={{ color: 'white' }}>
                           <i className="fas fa-user me-2" style={{ color: 'white' }}></i>
                           ข้อมูลลูกค้า
@@ -3541,7 +3541,7 @@ function DashboardOwner() {
                   </div>
                   <div className="col-md-6">
                     <div className="card h-100" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
                         <h6 className="mb-0" style={{ color: 'white' }}>
                           <i className="fas fa-spa me-2" style={{ color: 'white' }}></i>
                           ข้อมูลบริการ
@@ -3573,7 +3573,7 @@ function DashboardOwner() {
                 <div className="row mb-4">
                   <div className="col-md-6">
                     <div className="card h-100" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
                         <h6 className="mb-0" style={{ color: 'white' }}>
                           <i className="fas fa-calendar-alt me-2" style={{ color: 'white' }}></i>
                           ข้อมูลการจอง
@@ -3613,7 +3613,7 @@ function DashboardOwner() {
                   </div>
                   <div className="col-md-6">
                     <div className="card h-100" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
                         <h6 className="mb-0" style={{ color: 'white' }}>
                           <i className="fas fa-check-circle me-2" style={{ color: 'white' }}></i>
                           สถานะ
@@ -3673,7 +3673,7 @@ function DashboardOwner() {
                 <div className="row mb-3">
                   <div className="col-12">
                     <div className="card" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
                         <h6 className="mb-0" style={{ color: 'white' }}>
                           <i className="fas fa-history me-2" style={{ color: 'white' }}></i>
                           ประวัติการดำเนินการ
@@ -3745,13 +3745,13 @@ function DashboardOwner() {
                                 width: '40px',
                                 height: '40px',
                                 borderRadius: '50%',
-                                background: 'rgba(220, 53, 69, 0.1)',
+                                background: '#5D4037',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 marginRight: '15px'
                               }}>
-                                <i className="fas fa-times" style={{ color: '#dc3545' }}></i>
+                                <i className="fas fa-times" style={{ color: 'white' }}></i>
                               </div>
                               <div>
                                 <div className="fw-medium">ปฏิเสธการจอง</div>
@@ -3774,13 +3774,13 @@ function DashboardOwner() {
                                 width: '40px',
                                 height: '40px',
                                 borderRadius: '50%',
-                                background: 'rgba(0, 123, 255, 0.1)',
+                                background: '#5D4037',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 marginRight: '15px'
                               }}>
-                                <i className="fas fa-money-bill-wave" style={{ color: '#0d6efd' }}></i>
+                                <i className="fas fa-money-bill-wave" style={{ color: 'white' }}></i>
                               </div>
                               <div>
                                 <div className="fw-medium">ชำระเงิน</div>

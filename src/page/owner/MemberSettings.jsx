@@ -401,13 +401,6 @@ function MemberSettings() {
                                       <i className="fas fa-eye"></i>
                                     </button>
                                     <button 
-                                      className="btn btn-outline-secondary" 
-                                      onClick={() => startEdit(member)}
-                                      title="แก้ไข"
-                                    >
-                                      <i className="fas fa-edit"></i>
-                                    </button>
-                                    <button 
                                       className="btn btn-outline-danger" 
                                       onClick={() => handleDelete(member.id)}
                                       title="ลบ"
@@ -465,12 +458,12 @@ function MemberSettings() {
                       >
                         <i className="fas fa-plus-circle me-2"></i>
                         เพิ่มแต้ม
-                      <button 
-                        className={`nav-link ${activeSection === 'profile' ? 'active' : ''}`}
-                        onClick={() => setActiveSection('profile')}
-                      >
-                        <i className="fas fa-user me-1"></i> {selectedMember.fullname || selectedMember.name}
                       </button>
+                      <button 
+                        className="btn btn-warning" 
+                        onClick={() => openPointModal(selectedMember, 'subtract')}
+                        disabled={!selectedMember.points || selectedMember.points <= 0}
+                      >
                         <i className="fas fa-minus-circle me-2"></i>
                         ลดแต้ม
                       </button>

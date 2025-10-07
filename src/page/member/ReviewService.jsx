@@ -667,9 +667,10 @@ function ReviewService() {
                 <p className="mb-0"><i className="fas fa-gift me-2"></i> <strong>รางวัล:</strong> คุณได้รับ 5 แต้มจากการรีวิว</p>
               </div>
               <div className="mt-4">
-                <button 
+                <button
                   type="button"
-                  className="btn btn-primary"
+                  className="primary-btn action-btn px-5 py-3"
+                  style={{ fontSize: '1.2rem', fontWeight: 'bold' }}
                   onClick={() => {
                     console.log('SUCCESS_SCREEN home button clicked');
                     navigate('/member/DashboardMember');
@@ -788,9 +789,9 @@ function ReviewService() {
                     )}
                   </div>
 
-                  <button 
-                    type="button" 
-                    className="btn btn-primary btn-lg px-5 py-3 mb-2" 
+                  <button
+                    type="button"
+                    className="primary-btn action-btn px-5 py-3 mb-2"
                     style={{fontSize: '1.2rem', fontWeight: 'bold'}}
                     onClick={(e) => {
                       // Log event target and computed styles to detect overlays or CSS blocking

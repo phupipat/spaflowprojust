@@ -160,6 +160,9 @@ function MemberRewards() {
       const validUntil = new Date();
       validUntil.setFullYear(validUntil.getFullYear() + 100); // เพิ่มไป 100 ปี
 
+      // สร้างรหัสแลกรางวัลในรูปแบบ PH ตามด้วยตัวเลข
+      const rewardCode = generateRewardCode();
+      
       const redemptionData = {
         userId: user.uid,
         rewardId: selectedReward.id,
@@ -170,7 +173,8 @@ function MemberRewards() {
         redeemedAt: new Date(),
         validUntil: validUntil,
         status: 'active',
-        used: false
+        used: false,
+        rewardCode: rewardCode // เพิ่มรหัสแลกรางวัล
       };
       const redemptionRef = await addDoc(collection(db, 'Redemptions'), redemptionData);
 
@@ -187,6 +191,9 @@ function MemberRewards() {
       // อัพเดตสถานะการแลกรางวัล
       setPoints(prev => prev - selectedReward.pointsCost);
       setRedemptionSuccess(true);
+      
+      // เก็บรหัสแลกในข้อมูล selectedReward เพื่อแสดงในหน้าสำเร็จ
+      setSelectedReward({...selectedReward, generatedCode: redemptionData.rewardCode});
       
       // ดึงข้อมูลประวัติการแลกรางวัลล่าสุด
       await fetchUserRedemptions();
@@ -217,6 +224,13 @@ function MemberRewards() {
   const daysRemaining = (validUntil) => {
     // ไม่ตรวจสอบวันหมดอายุ
     return validUntil ? 999999 : 0; // ส่งค่าจำนวนวันที่มาก ๆ เพื่อให้ไม่มีวันหมดอายุ
+  };
+
+  // ฟังก์ชันสร้างรหัสแลกรางวัลในรูปแบบ PH ตามด้วยตัวเลข
+  const generateRewardCode = () => {
+    // สร้างตัวเลขสุ่ม 6 หลัก
+    const randomDigits = Math.floor(100000 + Math.random() * 900000);
+    return `PH${randomDigits}`;
   };
 
   if (loading) {
@@ -423,6 +437,7 @@ function MemberRewards() {
               <thead className="table-light">
                 <tr>
                   <th>รางวัล</th>
+                  <th>รหัสแลกรางวัล</th>
                   <th>คะแนนที่ใช้</th>
                   <th>วันที่แลก</th>
                   <th>วันหมดอายุ</th>
@@ -433,6 +448,11 @@ function MemberRewards() {
                 {userRedemptions.map(redemption => (
                   <tr key={redemption.id}>
                     <td>{redemption.rewardName}</td>
+                    <td style={{ 
+                      fontFamily: 'monospace', 
+                      fontWeight: '600',
+                      letterSpacing: '1px'
+                    }}>{redemption.rewardCode || 'PH000000'}</td>
                     <td>{redemption.pointsUsed} แต้ม</td>
                     <td>{formatDate(redemption.redeemedAt)}</td>
                     <td>{formatDate(redemption.validUntil)}</td>
@@ -496,6 +516,23 @@ function MemberRewards() {
                   </div>
                   <h3 className="mb-3" style={{ color: '#2c3e50', fontWeight: '600' }}>แลกรางวัลสำเร็จ!</h3>
                   <p className="text-muted mb-4">คุณได้แลก "{selectedReward.name}" เรียบร้อยแล้ว</p>
+                  <div className="reward-code p-3 mb-3" style={{
+                    background: '#fff3cd',
+                    borderRadius: '15px',
+                    border: '2px dashed #ffc107'
+                  }}>
+                    <h5 className="mb-2" style={{ color: '#7B4019' }}>รหัสแลกรางวัล</h5>
+                    <div style={{ 
+                      fontSize: '2rem', 
+                      fontWeight: '700', 
+                      letterSpacing: '2px',
+                      color: '#2c3e50',
+                      fontFamily: 'monospace'
+                    }}>
+                      {selectedReward.generatedCode}
+                    </div>
+                    <small className="text-muted">กรุณาบันทึกรหัสนี้เพื่อใช้แลกรางวัล</small>
+                  </div>
                   <div className="points-summary p-3 mb-4" style={{
                     background: '#f8f9fa',
                     borderRadius: '15px'

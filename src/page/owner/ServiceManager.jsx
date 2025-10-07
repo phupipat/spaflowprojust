@@ -9,6 +9,8 @@ function ServiceManager() {
   const [duration, setDuration] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('');
   const [image, setImage] = useState(null);
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({ name: '', duration: '', price: '', description: '', imageUrl: '', type: '' });
@@ -38,11 +40,32 @@ function ServiceManager() {
       setLoading(false);
     };
     fetchServices();
-  }, [sortBy, sortOrder]); // เพิ่ม dependencies สำหรับการจัดเรียง
+  }, [sortBy, sortOrder, filterType, searchTerm]); // เพิ่ม dependencies สำหรับการค้นหาและฟิลเตอร์
 
   // ฟังก์ชันสำหรับจัดเรียงข้อมูล
   const sortServices = (servicesArray, sortField, order) => {
-    return [...servicesArray].sort((a, b) => {
+    // กรองข้อมูลตามคำค้นหาและประเภท
+    let filteredServices = [...servicesArray];
+    
+    // กรองตามคำค้นหา
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filteredServices = filteredServices.filter(service => 
+        service.name?.toLowerCase().includes(term) || 
+        service.description?.toLowerCase().includes(term) || 
+        service.id?.toLowerCase().includes(term)
+      );
+    }
+    
+    // กรองตามประเภท
+    if (filterType) {
+      filteredServices = filteredServices.filter(service => 
+        service.type === filterType
+      );
+    }
+    
+    // จัดเรียงข้อมูล
+    return filteredServices.sort((a, b) => {
       let aValue = a[sortField];
       let bValue = b[sortField];
       
@@ -74,6 +97,16 @@ function ServiceManager() {
       setSortBy(field);
       setSortOrder('asc');
     }
+  };
+
+  // ฟังก์ชันสำหรับค้นหาบริการ
+  const handleSearch = (term) => {
+    setSearchTerm(term);
+  };
+  
+  // ฟังก์ชันสำหรับกรองตามประเภท
+  const handleTypeFilter = (type) => {
+    setFilterType(type);
   };
 
   // อัปโหลดรูปภาพไป Firebase Storage และคืน URL
@@ -198,12 +231,16 @@ function ServiceManager() {
           <i className="fas fa-spa me-2 text-primary"></i>
           จัดการบริการนวด
         </h4>
-        <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
-          <i className="fas fa-plus me-1"></i> เพิ่มบริการใหม่
+        <button className="btn btn-brown" onClick={() => setShowAddForm(!showAddForm)}>
+          {showAddForm ? (
+            <><i className="fas fa-chevron-up me-1"></i> ซ่อนฟอร์ม</>
+          ) : (
+            <><i className="fas fa-plus me-1"></i> เพิ่มบริการใหม่</>
+          )}
         </button>
       </div>
-      <div className={`collapse ${showAddForm ? 'show' : ''}`} id="addServiceForm">
-      <div className="card mb-4 bg-light">
+      {showAddForm && (
+      <div className="card mb-4 bg-light shadow-sm">
         <div className="card-body">
           <form className="row g-3" onSubmit={editId ? handleEdit : handleAdd}>
             <div className="col-md-3">
@@ -247,7 +284,7 @@ function ServiceManager() {
             <div className="col-12">
               <div className="d-flex justify-content-end gap-2 mt-3">
                 {editId && <button type="button" className="btn btn-secondary" onClick={() => setEditId(null)}>ยกเลิก</button>}
-                <button type="submit" className={`btn ${editId ? 'btn-warning' : 'btn-success'}`}>
+                <button type="submit" className="btn" style={{ backgroundColor: editId ? '#a86a3d' : '#7B4019', color: 'white' }}>
                   <i className={`fas ${editId ? 'fa-save' : 'fa-plus'} me-1`}></i>
                   {editId ? 'บันทึกการแก้ไข' : 'เพิ่มบริการ'}
                 </button>
@@ -256,7 +293,7 @@ function ServiceManager() {
           </form>
         </div>
       </div>
-      </div>
+      )}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="mb-0">รายการบริการ</h5>
         <div className="d-flex gap-2 align-items-center">
@@ -264,42 +301,58 @@ function ServiceManager() {
           <div className="btn-group" role="group" aria-label="Sort options">
             <button 
               type="button" 
-              className={`btn btn-sm ${sortBy === 'id' ? 'btn-primary' : 'btn-outline-primary'}`}
+              className={`btn btn-sm ${sortBy === 'id' ? 'btn-brown' : 'btn-outline-secondary'}`}
               onClick={() => handleSortChange('id')}
             >
               รหัสบริการ {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
             <button 
               type="button" 
-              className={`btn btn-sm ${sortBy === 'name' ? 'btn-primary' : 'btn-outline-primary'}`}
+              className={`btn btn-sm ${sortBy === 'name' ? 'btn-brown' : 'btn-outline-secondary'}`}
               onClick={() => handleSortChange('name')}
             >
               ชื่อบริการ {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
             <button 
               type="button" 
-              className={`btn btn-sm ${sortBy === 'duration' ? 'btn-primary' : 'btn-outline-primary'}`}
+              className={`btn btn-sm ${sortBy === 'duration' ? 'btn-brown' : 'btn-outline-secondary'}`}
               onClick={() => handleSortChange('duration')}
             >
               ระยะเวลา {sortBy === 'duration' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
           </div>
           
-          <select className="form-select form-select-sm" style={{ width: 'auto' }} onChange={(e) => handleSortChange('type')}>
-            <option value="">ประเภทบริการ</option>
+          <select 
+            className="form-select form-select-sm" 
+            style={{ width: 'auto' }} 
+            value={filterType}
+            onChange={(e) => handleTypeFilter(e.target.value)}
+          >
+            <option value="">ทุกประเภท</option>
             <option value="MASSAGE">MASSAGE</option>
             <option value="AROMA MASSAGE">AROMA MASSAGE</option>
             <option value="SPA">SPA</option>
             <option value="ONSEN">ONSEN</option>
           </select>
           
-          <input 
-            type="text" 
-            className="form-control form-control-sm" 
-            placeholder="ค้นหา..." 
-            style={{ width: '200px' }} 
-            onChange={(e) => console.log(e.target.value)}
-          />
+          <div className="position-relative" style={{ width: '200px' }}>
+            <input 
+              type="text" 
+              className="form-control form-control-sm" 
+              placeholder="ค้นหา..." 
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+            {searchTerm && (
+              <button 
+                className="btn btn-sm position-absolute" 
+                style={{ right: '0', top: '0', border: 'none' }}
+                onClick={() => setSearchTerm('')}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {loading ? (
@@ -311,7 +364,7 @@ function ServiceManager() {
         </div>
       ) : (
         <div className="row g-3">
-          {services.length === 0 && <div className="col-12 text-center py-5 text-muted">ยังไม่มีบริการ <button className="btn btn-sm btn-primary ms-2" onClick={() => setShowAddForm(true)}>เพิ่มบริการใหม่</button></div>}
+          {services.length === 0 && <div className="col-12 text-center py-5 text-muted">ยังไม่มีบริการ <button className="btn btn-brown ms-2" onClick={() => setShowAddForm(true)}><i className="fas fa-plus-circle me-1"></i> เพิ่มบริการใหม่</button></div>}
           {services.map((s) => (
             <div key={s.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
               <div 
@@ -352,7 +405,7 @@ function ServiceManager() {
                   {s.createdAt && <p className="card-text text-muted small mb-2"><i className="far fa-calendar-alt me-1"></i>เพิ่มเมื่อ: {s.createdAt.toLocaleString()}</p>}
                   <div className="d-grid gap-2 mt-auto">
                     <div className="d-flex justify-content-center gap-2">
-                      <button className="btn btn-sm btn-outline-warning" onClick={e => { e.stopPropagation(); startEdit(s); }}>
+                      <button className="btn btn-sm" style={{ borderColor: '#a86a3d', color: '#a86a3d' }} onClick={e => { e.stopPropagation(); startEdit(s); }}>
                         <i className="fas fa-edit me-1"></i> แก้ไข
                       </button>
                       <button className="btn btn-sm btn-outline-danger" onClick={e => { e.stopPropagation(); handleDelete(s.id); }}>

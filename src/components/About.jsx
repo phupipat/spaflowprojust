@@ -32,6 +32,31 @@ const About = () => {
           .hover-card:hover .icon-circle {
             transform: scale(1.1);
           }
+          
+          /* Gallery Styles */
+          .hover-card {
+            overflow: hidden;
+            cursor: pointer;
+          }
+          
+          .hover-card img {
+            transition: all 0.6s ease;
+          }
+          
+          .hover-card:hover img {
+            transform: scale(1.1);
+            filter: brightness(1.1);
+          }
+          
+          .hover-card .overlay {
+            transition: all 0.3s ease;
+            opacity: 0.9;
+          }
+          
+          .hover-card:hover .overlay {
+            opacity: 1;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 80%, rgba(255,125,41,0.3) 100%);
+          }
         `}
       </style>
       
@@ -173,7 +198,9 @@ const About = () => {
                      style={{ 
                        background: '#FF7D29', 
                        border: 'none',
-                       borderRadius: '50px'
+                       borderRadius: '50px',
+                       color: '#fff',
+                       fontWeight: 600
                      }}>
                     <i className="fas fa-paper-plane me-2" style={{ color: '#fff' }}></i> ติดต่อเรา
                   </a>
@@ -183,8 +210,137 @@ const About = () => {
           </div>
         </div>
       </main>
+
+      {/* Gallery Section */}
+      <section className="py-5 bg-light" style={{ 
+        background: 'linear-gradient(to bottom, #f8f9fa, #e9ecef) !important' 
+      }}>
+        <div className="container px-4 px-lg-5">
+          <div className="text-center mb-5 animate__animated animate__fadeIn" style={{ animation: 'fadeIn 1s' }}>
+            <i className="fas fa-images fa-2x mb-3" style={{ color: '#FF7D29' }}></i>
+            <h2 className="fw-bold mb-3" style={{ fontSize: '2.2rem', color: '#333' }}>ภาพบรรยากาศภายในร้าน</h2>
+            <div className="d-flex justify-content-center">
+              <div className="divider" style={{ 
+                width: '80px', 
+                height: '4px', 
+                background: 'linear-gradient(90deg, #FF7D29 0%, #FFBF78 100%)',
+                margin: '12px auto',
+                borderRadius: '2px'
+              }}></div>
+            </div>
+            <p className="text-muted col-lg-8 mx-auto">สัมผัสบรรยากาศที่ผ่อนคลายและการตกแต่งที่เป็นเอกลักษณ์ของ SpaFlow ด้วยภาพถ่ายจากสถานที่จริง</p>
+          </div>
+          
+          <div className="row g-3">
+            <div className="col-lg-4 col-md-6">
+              <div className="hover-card rounded overflow-hidden shadow-sm position-relative">
+                <div className="ratio ratio-1x1">
+                  <img src="/assets/publicServicesimg/reat-wecome.jpg" alt="SpaFlow Reception" className="img-fluid" 
+                      style={{ objectFit: 'cover', transition: 'all 0.5s ease' }} />
+                </div>
+                <div className="overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-end p-3"
+                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%)' }}>
+                  <h5 className="text-white m-0">บริเวณต้อนรับ</h5>
+                </div>
+              </div>
+            </div>
+            
+            <div className="col-lg-4 col-md-6">
+              <div className="hover-card rounded overflow-hidden shadow-sm position-relative">
+                <div className="ratio ratio-1x1">
+                  <img src="/assets/publicServicesimg/onsen-room.jpg" alt="Onsen Bath" className="img-fluid" 
+                      style={{ objectFit: 'cover', transition: 'all 0.5s ease' }} />
+                </div>
+                <div className="overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-end p-3"
+                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%)' }}>
+                  <h5 className="text-white m-0">ห้องบริการออนเซ็น</h5>
+                </div>
+              </div>
+            </div>
+            
+            <div className="col-lg-4 col-md-6">
+              <div className="hover-card rounded overflow-hidden shadow-sm position-relative">
+                <div className="ratio ratio-1x1">
+                  <img src="/assets/publicServicesimg/Aromaroom.jpg" alt="Aromatherapy Room" className="img-fluid" 
+                      style={{ objectFit: 'cover', transition: 'all 0.5s ease' }} />
+                </div>
+                <div className="overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-end p-3"
+                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%)' }}>
+                  <h5 className="text-white m-0">ห้องอโรม่าเธอราพี</h5>
+                </div>
+              </div>
+            </div>
+            
+            <div className="col-lg-3 col-md-6">
+              <div className="hover-card rounded overflow-hidden shadow-sm position-relative">
+                <div className="ratio ratio-1x1">
+                  <img src="/assets/publicServicesimg/spa-facial.jpg" alt="Facial Treatment" className="img-fluid" 
+                      style={{ objectFit: 'cover', transition: 'all 0.5s ease' }} />
+                </div>
+                <div className="overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-end p-3"
+                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%)' }}>
+                  <h5 className="text-white m-0">บริการสปาหน้า</h5>
+                </div>
+              </div>
+            </div>
+            
+            <div className="col-lg-3 col-md-6">
+              <div className="hover-card rounded overflow-hidden shadow-sm position-relative">
+                <div className="ratio ratio-1x1">
+                  <img src="/assets/publicServicesimg/massage-thai.jpg" alt="Thai Massage Room" className="img-fluid" 
+                      style={{ objectFit: 'cover', transition: 'all 0.5s ease' }} />
+                </div>
+                <div className="overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-end p-3"
+                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%)' }}>
+                  <h5 className="text-white m-0">นวดแผนไทย</h5>
+                </div>
+              </div>
+            </div>
+            
+            <div className="col-lg-3 col-md-6">
+              <div className="hover-card rounded overflow-hidden shadow-sm position-relative">
+                <div className="ratio ratio-1x1">
+                  <img src="/assets/publicServicesimg/massage-oil.jpg" alt="Oil Massage" className="img-fluid" 
+                      style={{ objectFit: 'cover', transition: 'all 0.5s ease' }} />
+                </div>
+                <div className="overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-end p-3"
+                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%)' }}>
+                  <h5 className="text-white m-0">นวดน้ำมัน</h5>
+                </div>
+              </div>
+            </div>
+            
+            <div className="col-lg-3 col-md-6">
+              <div className="hover-card rounded overflow-hidden shadow-sm position-relative">
+                <div className="ratio ratio-1x1">
+                  <img src="/assets/publicServicesimg/milk-bath.jpg" alt="Milk Bath" className="img-fluid" 
+                      style={{ objectFit: 'cover', transition: 'all 0.5s ease' }} />
+                </div>
+                <div className="overlay position-absolute top-0 start-0 w-100 h-100 d-flex align-items-end p-3"
+                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%)' }}>
+                  <h5 className="text-white m-0">อ่างอาบนมสปา</h5>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-center mt-4">
+            <a href="/services" className="btn btn-warning px-4 py-2 btn-lg" 
+               style={{ 
+                 background: '#FF7D29', 
+                 border: 'none',
+                 borderRadius: '50px',
+                 color: '#fff',
+                 fontWeight: 600
+               }}>
+              <i className="fas fa-spa me-2" style={{ color: '#fff' }}></i> ดูบริการทั้งหมด
+            </a>
+          </div>
+        </div>
+      </section>
+      
       {/* Footer */}
-      <footer className="border-top bg-light py-5 mt-5" style={{ 
+      <footer className="border-top bg-light py-5 mt-0" style={{ 
         background: 'linear-gradient(to bottom, #f8f9fa, #e9ecef) !important' 
       }}>
         <div className="container">

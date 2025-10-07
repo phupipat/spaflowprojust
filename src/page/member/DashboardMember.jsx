@@ -3,8 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../../Firebase';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
-import { Link } from 'react-router-dom';
-import { FaCalendarAlt, FaUserCircle, FaClock, FaStar, FaHistory, FaRegClock, FaSignOutAlt, FaChevronRight } from 'react-icons/fa';
 import { MdSpa, MdPerson } from 'react-icons/md';
 import '../../../src/styles/SharedStyles.css';
 import '../../../src/styles/DashboardStyles.css';
@@ -26,6 +24,8 @@ function DashboardMember() {
   const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'info' });
   // สำหรับเก็บ bookings ก่อนหน้าเพื่อเปรียบเทียบการเปลี่ยนแปลงสถานะ
   const [prevBookings, setPrevBookings] = useState([]);
+  // สถานะกำลังรีเฟรชข้อมูล
+  const [refreshing, setRefreshing] = useState(false);
 
   // ฟังก์ชันสำหรับแสดงการแจ้งเตือนแบบ popup
   const showNotification = (title, message, type = 'info') => {
@@ -33,7 +33,7 @@ function DashboardMember() {
     // ซ่อนอัตโนมัติหลัง 10 วินาที
     setTimeout(() => {
       setNotification({ show: false, title: '', message: '', type: 'info' });
-    }, 10000);
+    }, 20000);
   };
 
   // ฟังก์ชันสำหรับซ่อน popup
@@ -330,11 +330,11 @@ function DashboardMember() {
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [user, fetchData]);
 
   // แจ้งเตือนเมื่อสถานะการจองเปลี่ยนเป็น "ยืนยันแล้ว" (อนุมัติ) หรือสามารถรีวิวได้ทันที
   useEffect(() => {
-    if (!bookings || bookings.length === 0) return;
+    if (!bookings || bookings.length === 0 || !prevBookings.length) return;
     // ตรวจสอบการเปลี่ยนแปลงสถานะการจอง (อนุมัติ)
     prevBookings.forEach(prev => {
       const curr = bookings.find(b => b.id === prev.id);
@@ -356,6 +356,20 @@ function DashboardMember() {
     setPrevBookings(bookings.map(b => ({ id: b.id, status: b.status, canReview: b.canReview })));
   }, [bookings]);
 
+  // ฟังก์ชันสำหรับรีเฟรชข้อมูลด้วยตัวเอง
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchData();
+      showNotification('รีเฟรชข้อมูลสำเร็จ', 'ข้อมูลถูกอัปเดตเป็นเวอร์ชันล่าสุดแล้ว', 'success');
+    } catch (error) {
+      console.error('เกิดข้อผิดพลาดในการรีเฟรชข้อมูล:', error);
+      showNotification('เกิดข้อผิดพลาด', 'ไม่สามารถรีเฟรชข้อมูลได้ กรุณาลองใหม่ภายหลัง', 'error');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // --- รีเฟรชข้อมูลอัตโนมัติ ---
   useEffect(() => {
     if (!user) return;
@@ -363,8 +377,10 @@ function DashboardMember() {
       fetchData();
   }, 15000); // 15 วินาที
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, fetchData]);
 
+  // TODO: This function is currently unused but kept for potential future implementation
+  // Consider removing if not needed in the future or implementing where appropriate
   const handleCompleteBooking = async (bookingId) => {
     try {
       await updateDoc(doc(db, 'Bookings', bookingId), { status: 'เสร็จสิ้น' });
@@ -1093,10 +1109,41 @@ function DashboardMember() {
         {activeTab === 'bookings' && (
           <div className="content-card">
             <div className="card-header bg-gradient text-white p-4" style={{ background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', borderBottom: '3px solid #ff7730' }}>
-              <h4 className="mb-0" style={{ color: '#ff7730' }}>
-                <i className="fas fa-calendar-check me-2"></i>
-                การจองของฉัน
-              </h4>
+              <div className="d-flex justify-content-between align-items-center">
+                <h4 className="mb-0" style={{ color: '#ff7730' }}>
+                  <i className="fas fa-calendar-check me-2"></i>
+                  การจองของฉัน
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleManualRefresh} 
+                  disabled={refreshing}
+                  style={{
+                    backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                    color: '#ff7730',
+                    border: '1px solid #ff7730',
+                    borderRadius: '20px',
+                    padding: '5px 15px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="รีเฟรชข้อมูล"
+                >
+                  {refreshing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      <span className="ms-1">กำลังรีเฟรช...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync-alt"></i>
+                      <span className="ms-1">รีเฟรชข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className="card-body p-4">
               {/* ปุ่มตัวกรอง */}
@@ -1275,7 +1322,16 @@ function DashboardMember() {
                                 <div className="detail-icon">
                                   <i className="fas fa-money-bill-wave"></i>
                                 </div>
-                                <span>{Number(b.price || b.cost || b.amount || 1690).toLocaleString()} บาท</span>
+                                {b.discount && b.discount > 0 ? (
+                                  <span>
+                                    <span className="text-decoration-line-through text-muted me-1" style={{ fontSize: '0.75rem' }}>
+                                      {Number(b.price || b.cost || b.amount || 0).toLocaleString()}
+                                    </span>
+                                    {Number((b.price || b.cost || b.amount || 0) - b.discount).toLocaleString()} บาท
+                                  </span>
+                                ) : (
+                                  <span>{Number(b.price || b.cost || b.amount || 0).toLocaleString()} บาท</span>
+                                )}
                               </div>
                             </div>
 
@@ -1342,10 +1398,41 @@ function DashboardMember() {
         {activeTab === 'services' && (
           <div className="content-card">
             <div className="card-header bg-gradient text-white p-4" style={{ background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', borderBottom: '3px solid #ff7730' }}>
-              <h4 className="mb-0" style={{ color: '#ff7730' }}>
-                <i className="fas fa-spa me-2"></i>
-                จองบริการ
-              </h4>
+              <div className="d-flex justify-content-between align-items-center">
+                <h4 className="mb-0" style={{ color: '#ff7730' }}>
+                  <i className="fas fa-spa me-2"></i>
+                  จองบริการ
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleManualRefresh} 
+                  disabled={refreshing}
+                  style={{
+                    backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                    color: '#ff7730',
+                    border: '1px solid #ff7730',
+                    borderRadius: '20px',
+                    padding: '5px 15px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="รีเฟรชข้อมูล"
+                >
+                  {refreshing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      <span className="ms-1">กำลังรีเฟรช...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync-alt"></i>
+                      <span className="ms-1">รีเฟรชข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className="card-body p-4">
               <div className="text-center py-5">
@@ -1374,10 +1461,41 @@ function DashboardMember() {
         {activeTab === 'rewards' && (
           <div className="content-card">
             <div className="card-header bg-gradient text-white p-4" style={{ background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', borderBottom: '3px solid #ff7730' }}>
-              <h4 className="mb-0" style={{ color: '#ff7730' }}>
-                <i className="fas fa-gift me-2"></i>
-                แลกรางวัล
-              </h4>
+              <div className="d-flex justify-content-between align-items-center">
+                <h4 className="mb-0" style={{ color: '#ff7730' }}>
+                  <i className="fas fa-gift me-2"></i>
+                  แลกรางวัล
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleManualRefresh} 
+                  disabled={refreshing}
+                  style={{
+                    backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                    color: '#ff7730',
+                    border: '1px solid #ff7730',
+                    borderRadius: '20px',
+                    padding: '5px 15px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="รีเฟรชข้อมูล"
+                >
+                  {refreshing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      <span className="ms-1">กำลังรีเฟรช...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync-alt"></i>
+                      <span className="ms-1">รีเฟรชข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className="card-body p-4">
               <div className="text-center py-5">
@@ -1405,10 +1523,41 @@ function DashboardMember() {
         {activeTab === 'history' && (
           <div className="content-card">
             <div className="card-header bg-gradient text-white p-4" style={{ background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', borderBottom: '3px solid #ff7730' }}>
-              <h4 className="mb-0" style={{ color: '#ff7730' }}>
-                <i className="fas fa-history me-2"></i>
-                ประวัติแต้ม/รายการ
-              </h4>
+              <div className="d-flex justify-content-between align-items-center">
+                <h4 className="mb-0" style={{ color: '#ff7730' }}>
+                  <i className="fas fa-history me-2"></i>
+                  ประวัติแต้ม/รายการ
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleManualRefresh} 
+                  disabled={refreshing}
+                  style={{
+                    backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                    color: '#ff7730',
+                    border: '1px solid #ff7730',
+                    borderRadius: '20px',
+                    padding: '5px 15px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="รีเฟรชข้อมูล"
+                >
+                  {refreshing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      <span className="ms-1">กำลังรีเฟรช...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync-alt"></i>
+                      <span className="ms-1">รีเฟรชข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className="card-body p-4">
               {pointHistory.length === 0 ? (

@@ -665,7 +665,7 @@ const PaymentReport = () => {
             </div>
             <div className="col-md-6 d-flex align-items-end mb-3">
               <button 
-                className="btn btn-primary me-2" 
+                className="btn btn-brown me-2" 
                 onClick={handleDateFilter}
               >
                 <i className="fas fa-filter me-1"></i>
@@ -679,7 +679,7 @@ const PaymentReport = () => {
                 รีเซ็ต
               </button>
               <button 
-                className="btn btn-outline-primary" 
+                className="btn btn-outline-secondary" 
                 onClick={setToday}
               >
                 <i className="fas fa-calendar-day me-1"></i>

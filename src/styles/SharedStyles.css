@@ -123,6 +123,20 @@ body {
   box-shadow: 0 0 0 0.2rem rgba(255, 140, 64, 0.25);
 }
 
+.btn-brown {
+  background-color: #7B4019;
+  border-color: #7B4019;
+  color: white;
+  transition: all var(--transition-normal);
+}
+
+.btn-brown:hover, .btn-brown:focus {
+  background-color: #8B4513;
+  border-color: #8B4513;
+  color: white;
+  box-shadow: 0 0 0 0.2rem rgba(139, 69, 19, 0.25);
+}
+
 .btn-outline-primary {
   color: var(--color-primary);
   border-color: var(--color-primary);

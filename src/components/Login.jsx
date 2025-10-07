@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardOwner from '../page/owner/DashboardOwner';
 import DashboardEmployee from '../page/employee/DashboardEmployee';
 import DashboardMember from '../page/member/DashboardMember';
+import '../styles/Login.css';
 
 function App() {
   // State variables for form inputs and application status
@@ -182,39 +183,38 @@ function App() {
 
     // แสดงเฉพาะหน้า login เนื่องจาก navigation จะเปลี่ยนหน้าอัตโนมัติ
     return (
-      <section className="h-100 gradient-form" style={{ backgroundColor: '#eee', minHeight: '100vh' }}>
+      <section className="h-100 gradient-form login-container">
         <div className="container py-5 h-100">
           <div className="row d-flex justify-content-center align-items-center h-100">
             <div className="col-xl-10">
-              <div className="card rounded-3 text-black shadow-lg border-0" style={{ maxWidth: 900, margin: '0 auto' }}>
+              <div className="card rounded-3 text-black shadow-lg border-0 login-card">
                 <div className="row g-0">
-                  <div className="col-lg-6 d-flex align-items-center justify-content-center">
-                    <div className="card-body p-md-5 mx-md-4 w-100" style={{ maxWidth: 400, width: '100%' }}>
-                      <div className="text-center mb-4">
-                        <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/lotus.webp"
-                          style={{ width: '120px' }} alt="logo"
-                          onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/120x120/cccccc/333333?text=โลโก้"; }}
-                        />
-                        <h4 className="mt-3 mb-4 pb-1 fw-bold">ยินดีต้อนรับสู่ SpaFlow</h4>
+                  <div className="col-lg-6 d-flex align-items-center justify-content-center login-card-left">
+                    <div className="card-body p-md-5 mx-md-4 w-100 login-form-container">
+                      <div className="text-center mb-4 logo-container">
+                        <div className="logo-circle">
+                          <i className="fas fa-spa fa-4x text-white"></i>
+                        </div>
+                        <h4 className="mt-4 mb-2 fw-bold logo-text">ยินดีต้อนรับสู่ SpaFlow</h4>
+                        <p className="text-muted small">ระบบจัดการร้านสปาครบวงจร</p>
                       </div>
-                      <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
-                        <p className="fw-semibold mb-3 text-center">กรุณาเข้าสู่ระบบบัญชีของคุณ</p>
+                      <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="login-form">
+                        <p className="fw-semibold mb-3 text-center form-header">กรุณาเข้าสู่ระบบบัญชีของคุณ</p>
                         {errorMsg && (
-                          <div className="alert alert-danger py-2" role="alert">
+                          <div className="alert alert-danger py-2 custom-alert" role="alert">
                             <i className="fas fa-exclamation-circle me-2"></i>
                             {errorMsg}
                           </div>
                         )}
                         <div className="form-outline mb-4">
                           <div className="input-group">
-                            <span className="input-group-text bg-white border-end-0">
-                              <i className="fas fa-envelope text-muted"></i>
+                            <span className="input-group-text bg-white border-end-0 input-group-icon">
+                              <i className="fas fa-envelope"></i>
                             </span>
                             <input
                               type="email"
                               id="form2Example11"
-                              className="form-control form-control-lg bg-white border-start-0 rounded-end px-3 py-2"
-                              style={{ boxSizing: 'border-box', minHeight: 48, borderColor: '#ced4da' }}
+                              className="form-control form-control-lg bg-white border-start-0 rounded-end px-3 py-2 custom-input"
                               placeholder="อีเมลของคุณ"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
@@ -225,14 +225,13 @@ function App() {
                         </div>
                         <div className="form-outline mb-4">
                           <div className="input-group">
-                            <span className="input-group-text bg-white border-end-0">
-                              <i className="fas fa-lock text-muted"></i>
+                            <span className="input-group-text bg-white border-end-0 input-group-icon">
+                              <i className="fas fa-lock"></i>
                             </span>
                             <input
                               type="password"
                               id="form2Example22"
-                              className="form-control form-control-lg bg-white border-start-0 rounded-end px-3 py-2"
-                              style={{ boxSizing: 'border-box', minHeight: 48, borderColor: '#ced4da' }}
+                              className="form-control form-control-lg bg-white border-start-0 rounded-end px-3 py-2 custom-input"
                               placeholder="รหัสผ่าน"
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
@@ -243,12 +242,7 @@ function App() {
                         <div className="text-center pt-1 mb-4 pb-1">
                           <button
                             type="submit"
-                            className="btn btn-primary btn-block w-100 mb-3"
-                            style={{
-                              background: '#7B4019',
-                              border: 'none',
-                              fontWeight: 600
-                            }}
+                            className="btn btn-primary btn-block w-100 mb-3 login-button"
                             disabled={isLoading}
                           >
                             {isLoading ? (
@@ -263,36 +257,74 @@ function App() {
                               </>
                             )}
                           </button>
-                          <a className="text-muted small" href="#">ลืมรหัสผ่าน?</a>
+                          <a className="small forgot-password" href="/reset-password">ลืมรหัสผ่าน?</a>
                         </div>
-                        <div className="d-flex align-items-center justify-content-center pb-2">
-                          <p className="mb-0 me-2">ยังไม่มีบัญชี?</p>
-                          <button
-                            type="button"
-                            className="btn btn-outline-danger btn-sm me-2"
-                            onClick={() => window.location.href = '/signup'}
-                          >
-                            สร้างบัญชีใหม่
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline-secondary btn-sm"
-                            onClick={() => window.location.href = '/'}
-                          >
-                            กลับหน้าแรก
-                          </button>
+                        <div className="d-flex align-items-center justify-content-center pb-2 flex-wrap mt-4">
+                          <p className="mb-3 me-3 text-muted">ยังไม่มีบัญชี?</p>
+                          <div>
+                            <button
+                              type="button"
+                              className="btn me-2 register-btn"
+                              onClick={() => window.location.href = '/signup'}
+                            >
+                              <i className="fas fa-user-plus me-2"></i>
+                              สร้างบัญชีใหม่
+                            </button>
+                            <button
+                              type="button"
+                              className="btn home-btn"
+                              onClick={() => window.location.href = '/'}
+                            >
+                              <i className="fas fa-home me-2"></i>
+                              กลับหน้าแรก
+                            </button>
+                          </div>
                         </div>
                       </form>
                     </div>
                   </div>
-                  <div className="col-lg-6 d-flex align-items-stretch gradient-custom-2 rounded-end" style={{ minHeight: 500 }}>
+                  <div className="col-lg-6 d-flex align-items-stretch gradient-custom-2 rounded-end right-panel">
                     <div className="text-white px-4 py-4 p-md-5 mx-md-4 d-flex flex-column justify-content-center w-100">
-                      <h4 className="mb-4 fw-bold">เราเป็นมากกว่าแค่ระบบร้านสปา</h4>
-                      <p className="small mb-0" style={{ lineHeight: 1.7 }}>
-                        เราเป็นผู้ช่วยในการดูแลความผ่อนคลายและสุขภาพของคุณอย่างรอบด้าน
-                        ทุกฟีเจอร์ถูกออกแบบโดยคำนึงถึงประสบการณ์ของผู้ใช้งานเป็นสำคัญ
-                        เพื่อให้คุณรู้สึกมั่นใจ อุ่นใจ และพึงพอใจในทุกครั้งที่ใช้บริการกับเรา
-                      </p>
+                      <div className="feature-title">
+                        <div className="d-flex align-items-center mb-4">
+                          <div className="feature-icon large-icon">
+                            <i className="fas fa-spa fa-2x text-white"></i>
+                          </div>
+                          <h3 className="mb-0 fw-bold">เราเป็นมากกว่า<br/>แค่ระบบร้านสปา</h3>
+                        </div>
+                      </div>
+                      
+                      <div className="feature-list">
+                        <div className="d-flex mb-4">
+                          <div className="feature-icon">
+                            <i className="fas fa-check text-white"></i>
+                          </div>
+                          <div>
+                            <h6 className="fw-bold mb-1">จัดการการจองที่ง่ายดาย</h6>
+                            <p className="small mb-0">ระบบการจองที่ใช้งานง่าย ทั้งสำหรับลูกค้าและผู้ดูแลระบบ</p>
+                          </div>
+                        </div>
+                        
+                        <div className="d-flex mb-4">
+                          <div className="feature-icon">
+                            <i className="fas fa-chart-line text-white"></i>
+                          </div>
+                          <div>
+                            <h6 className="fw-bold mb-1">รายงานและการวิเคราะห์</h6>
+                            <p className="small mb-0">ติดตามผลการดำเนินงานและเพิ่มประสิทธิภาพธุรกิจของคุณ</p>
+                          </div>
+                        </div>
+                        
+                        <div className="d-flex">
+                          <div className="feature-icon">
+                            <i className="fas fa-shield-alt text-white"></i>
+                          </div>
+                          <div>
+                            <h6 className="fw-bold mb-1">ปลอดภัยและเชื่อถือได้</h6>
+                            <p className="small mb-0">ข้อมูลของคุณปลอดภัยด้วยระบบความปลอดภัยสูงสุดของเรา</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -313,31 +345,12 @@ function App() {
       {/* Optional: Bootstrap JS bundle if you need interactive components */}
       <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossOrigin="anonymous"></script>
 
-      {/* Custom styles for the gradient, as it's not a standard Bootstrap class */}
-      <style>
-        {`
-          .gradient-custom-2 {
-            background: #7B4019;
-          }
-          /* Ensure the form labels float correctly with Bootstrap form-outline */
-          .form-outline .form-control ~ .form-label {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            padding: 1rem 0.75rem;
-            pointer-events: none;
-            border: 1px solid transparent;
-            transform-origin: 0 0;
-            transition: opacity .15s ease-in-out,transform .15s ease-in-out;
-          }
-          .form-outline .form-control:focus ~ .form-label,
-          .form-outline .form-control:not(:placeholder-shown) ~ .form-label {
-            transform: translateY(-1rem) scale(0.8);
-            opacity: 0.65;
-          }
-        `}
-      </style>
+      {/* Bootstrap CSS CDN */}
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossOrigin="anonymous" />
+      {/* Font Awesome */}
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+      {/* Optional: Bootstrap JS bundle if you need interactive components */}
+      <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossOrigin="anonymous"></script>
       {renderView()}
     </>
   );

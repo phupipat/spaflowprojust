@@ -490,7 +490,7 @@ function StaffSchedule() {
         </h4>
         <div>
           <button 
-            className="btn btn-gradient btn-sm" 
+            className="btn btn-brown btn-sm" 
             onClick={() => {
               fetchEmployees();
               setShowAddModal(true);
@@ -549,7 +549,7 @@ function StaffSchedule() {
                   <i className="fas fa-chevron-left"></i>
                 </button>
                 <button 
-                  className="btn btn-outline-primary" 
+                  className="btn btn-outline-brown" 
                   onClick={goToToday}
                 >
                   วันนี้
@@ -566,7 +566,7 @@ function StaffSchedule() {
             <div className="col-md-3 text-end">
               <div className="btn-group">
                 <button 
-                  className={`btn btn-sm ${showMonthView ? 'btn-primary' : 'btn-outline-primary'}`}
+                  className={`btn btn-sm ${showMonthView ? 'btn-brown' : 'btn-outline-secondary'}`}
                   onClick={() => {
                     setShowMonthView(true);
                     setShowWeekView(false);
@@ -575,7 +575,7 @@ function StaffSchedule() {
                   <i className="fas fa-calendar me-1"></i> รายเดือน
                 </button>
                 <button 
-                  className={`btn btn-sm ${showWeekView ? 'btn-primary' : 'btn-outline-primary'}`}
+                  className={`btn btn-sm ${showWeekView ? 'btn-brown' : 'btn-outline-secondary'}`}
                   onClick={() => {
                     setShowWeekView(true);
                     setShowMonthView(false);
@@ -584,7 +584,7 @@ function StaffSchedule() {
                   <i className="fas fa-calendar-week me-1"></i> รายสัปดาห์
                 </button>
                 <button 
-                  className={`btn btn-sm ${!showWeekView && !showMonthView ? 'btn-primary' : 'btn-outline-primary'}`}
+                  className={`btn btn-sm ${!showWeekView && !showMonthView ? 'btn-brown' : 'btn-outline-secondary'}`}
                   onClick={() => {
                     setShowWeekView(false);
                     setShowMonthView(false);
@@ -673,7 +673,7 @@ function StaffSchedule() {
                                       <i className="fas fa-calendar-day text-muted mb-1" style={{ fontSize: '1rem' }}></i>
                                       <small className="text-muted">ว่าง (ไม่มีพนักงาน)</small>
                                       <button 
-                                        className="btn btn-sm btn-outline-primary mt-2 py-0 px-2" 
+                                        className="btn btn-sm btn-outline-brown mt-2 py-0 px-2" 
                                         style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1004,7 +1004,7 @@ function StaffSchedule() {
                             
                             <div className="text-center mt-2">
                               <button 
-                                className="btn btn-sm btn-outline-primary py-0"
+                                className="btn btn-sm btn-outline-brown py-0"
                                 style={{ fontSize: '0.75rem' }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1116,7 +1116,7 @@ function StaffSchedule() {
                         </td>
                         <td>
                           <button 
-                            className="btn btn-sm btn-outline-primary me-1" 
+                            className="btn btn-sm btn-outline-brown me-1" 
                             onClick={() => handleEditStaff(staff)}
                           >
                             <i className="fas fa-calendar-alt me-1"></i>
@@ -1200,7 +1200,7 @@ function StaffSchedule() {
                   <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>ยกเลิก</button>
                   <button 
                     type="submit" 
-                    className="btn btn-primary"
+                    className="btn btn-brown"
                     disabled={!newStaff.userId || employees.length === 0}
                   >
                     บันทึก
@@ -1293,7 +1293,7 @@ function StaffSchedule() {
                         <div className="mt-2 d-flex flex-wrap gap-2">
                           <button 
                             type="button" 
-                            className="btn btn-sm btn-outline-primary"
+                            className="btn btn-sm btn-outline-brown"
                             onClick={() => setNewShift({...newShift, workDays: [...days]})}
                           >
                             เลือกทั้งหมด
@@ -1390,7 +1390,7 @@ function StaffSchedule() {
                 </div>
                 <div className="modal-footer" style={{ borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
                   <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)} style={{ minWidth: '100px' }}>ยกเลิก</button>
-                  <button type="submit" className="btn btn-primary" style={{ minWidth: '140px' }}>บันทึกการเปลี่ยนแปลง</button>
+                  <button type="submit" className="btn btn-brown" style={{ minWidth: '140px' }}>บันทึกการเปลี่ยนแปลง</button>
                 </div>
               </form>
             </div>
@@ -1595,7 +1595,7 @@ function StaffSchedule() {
                                         </td>
                                         <td className="text-center">
                                           <button 
-                                            className="btn btn-sm btn-outline-primary"
+                                            className="btn btn-sm btn-outline-brown"
                                             onClick={() => {
                                               handleEditStaff(staff);
                                               setShowDetailsModal(false);
@@ -1708,7 +1708,7 @@ function StaffSchedule() {
                 )}
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowDetailsModal(false)}>
+                <button type="button" className="btn btn-brown" onClick={() => setShowDetailsModal(false)}>
                   ปิด
                 </button>
               </div>

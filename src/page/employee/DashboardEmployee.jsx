@@ -1,11 +1,12 @@
 // src/pages/employee/DashboardEmployee.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { db } from '../../Firebase'; 
-import { collection, query, where, getDocs, doc as firestoreDoc, updateDoc, getDoc, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc as firestoreDoc, updateDoc, getDoc, orderBy } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../styles/SharedStyles.css';
+import '../../styles/DashboardStyles.css';
 
 function DashboardEmployee() {
   const { user, logout } = useAuth();
@@ -18,10 +19,8 @@ function DashboardEmployee() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentWeekStart, setCurrentWeekStart] = useState(new Date());
   const [activeTab, setActiveTab] = useState('appointments');
-  const [scheduleView, setScheduleView] = useState('week'); // 'week' หรือ 'month'
-  const [monthlySchedules, setMonthlySchedules] = useState([]);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentMonth] = useState(new Date().getMonth());
+  const [currentYear] = useState(new Date().getFullYear());
   const [reviews, setReviews] = useState([]);
   const [averageRating, setAverageRating] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -30,8 +29,40 @@ function DashboardEmployee() {
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [appointmentFilter, setAppointmentFilter] = useState('all'); // 'all', 'ongoing', 'completed'
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  // State สำหรับระบบแจ้งเตือน
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  // เก็บข้อมูลรีวิวครั้งก่อนเพื่อเปรียบเทียบ
+  const [prevReviewsCount, setPrevReviewsCount] = useState(0);
   // In-memory cache for service names to reduce Firestore reads
   const serviceCacheRef = React.useRef({});
+  
+  // ฟังก์ชันเพิ่มการแจ้งเตือน
+  const addNotification = (message, type = 'info') => {
+    const newNotification = {
+      id: Date.now(),
+      message,
+      type,
+      time: new Date().toLocaleTimeString('th-TH'),
+      read: false
+    };
+    setNotifications(prev => [newNotification, ...prev]);
+    setUnreadCount(prev => prev + 1);
+  };
+
+  // ฟังก์ชันอ่านการแจ้งเตือนทั้งหมด
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
+    setUnreadCount(0);
+  };
+
+  // ฟังก์ชันล้างการแจ้งเตือน
+  const clearNotifications = () => {
+    setNotifications([]);
+    setUnreadCount(0);
+  };
 
   useEffect(() => {
     // Update current time every 30 seconds (for auto-refresh)
@@ -100,8 +131,8 @@ function DashboardEmployee() {
           const weeklyData = generateWeeklySchedule(staffSchedules);
           setWeeklySchedule(weeklyData);
           
-          const monthlyData = generateMonthlySchedule(staffSchedules);
-          setMonthlySchedules(monthlyData);
+          // const monthlyData = generateMonthlySchedule(staffSchedules);
+          // setMonthlySchedules(monthlyData);
           // Prefer phone from Users collection (userData) but fall back to staff record
           try {
             const phoneFromUser = userData?.phone;
@@ -421,7 +452,7 @@ function DashboardEmployee() {
     // --- รีเฟรชข้อมูลอัตโนมัติ ---
     const interval = setInterval(() => {
       fetchData();
-    }, 90000); // 90 วินาที
+    }, 30000); // 30 วินาที
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, currentWeekStart, currentMonth, currentYear]);
@@ -488,44 +519,7 @@ function DashboardEmployee() {
     return schedules;
   }, [currentMonth, currentYear]);
 
-  // Fetch employee reviews
-  const fetchEmployeeReviews = useCallback(async (bookingsData = appointments) => {
-    try {
-  // ดึงรีวิวจากการจองที่เสร็จสิ้น
-      const completedAppointments = bookingsData.filter(appt => 
-        appt.status === 'เสร็จสิ้น' && (appt.rating || appt.review)
-      );
-      
-      // หากมีการให้คะแนนหรือรีวิวในการจอง ให้ดึงข้อมูลมาแสดง
-      const reviewData = completedAppointments.map(appt => ({
-        id: appt.id,
-        customerName: appt.customerName || 'ลูกค้า',
-        rating: appt.rating || 5,
-        comment: appt.review || 'บริการดีมาก',
-        service: appt.service || 'บริการสปา',
-        date: appt.date || new Date().toISOString().split('T')[0],
-        userEmail: appt.userEmail || ''
-      }));
-      
-      // ไม่ใช้ข้อมูลปลอมอีกต่อไป ใช้ข้อมูลจริงเท่านั้น
-      setReviews(reviewData);
-      
-      // Calculate average rating from real data
-      if (reviewData.length > 0) {
-        const totalRating = reviewData.reduce((sum, review) => sum + review.rating, 0);
-        const avgRating = (totalRating / reviewData.length).toFixed(1);
-        setAverageRating(avgRating);
-      } else {
-        // ถ้าไม่มีรีวิว ให้เป็น 0
-        setAverageRating('0.0');
-      }
-    } catch (error) {
-      console.error("Error fetching reviews:", error);
-      // กรณีเกิดข้อผิดพลาด ให้กำหนดเป็นอาร์เรย์ว่าง
-      setReviews([]);
-      setAverageRating('0.0');
-    }
-  }, [appointments]);
+
 
   // Change week function
   const changeWeek = (direction) => {
@@ -534,93 +528,7 @@ function DashboardEmployee() {
     setCurrentWeekStart(newDate);
   };
 
-  // Change month function
-  const changeMonth = (delta) => {
-    let newMonth = currentMonth + delta;
-    let newYear = currentYear;
-    
-    if (newMonth > 11) {
-      newMonth = 0;
-      newYear++;
-    } else if (newMonth < 0) {
-      newMonth = 11;
-      newYear--;
-    }
-    
-    setCurrentMonth(newMonth);
-    setCurrentYear(newYear);
-  };
 
-  // Generate calendar for monthly view
-  const generateCalendar = () => {
-    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const calendar = [];
-    
-    let day = 0;
-    let week = [];
-    
-    // Empty cells before first day
-    for (let i = 0; i < firstDay; i++) {
-      week.push(<td key={`empty-${i}`} className="calendar-day"></td>);
-      day++;
-    }
-    
-    // Days in month
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      const hasSchedule = monthlySchedules.some(s => s.date === date);
-      const isToday = date === new Date().toISOString().split('T')[0];
-      const dayAppointments = appointments.filter(appt => appt.date === date);
-      
-      week.push(
-        <td key={i} className={`calendar-day ${hasSchedule ? 'has-schedule' : ''} ${isToday ? 'today' : ''}`}>
-          <div className="date-number">{i}</div>
-          
-          <div className="appointment-list">
-            {dayAppointments.slice(0, 3).map((appt, idx) => (
-              <div 
-                key={idx} 
-                className="appointment-item"
-                title={`${appt.time || 'เวลาไม่ระบุ'} - ${appt.customerName || 'ลูกค้า'}: ${appt.service || 'บริการ'}`}
-              >
-                <i className="fas fa-clock me-1" style={{ fontSize: '0.7rem' }}></i>
-                {appt.time || '00:00'} {appt.service ? appt.service.substring(0, 10) + (appt.service.length > 10 ? '...' : '') : 'บริการ'}
-              </div>
-            ))}
-            
-            {dayAppointments.length > 3 && (
-              <div className="appointment-item" style={{ background: '#28a745' }}>
-                <i className="fas fa-plus me-1"></i>
-                อีก {dayAppointments.length - 3} รายการ
-              </div>
-            )}
-          </div>
-          
-          {dayAppointments.length > 0 && (
-            <div className="appointment-count">
-              {dayAppointments.length}
-            </div>
-          )}
-        </td>
-      );
-      
-      day++;
-      
-      if (day % 7 === 0 || i === daysInMonth) {
-        // Fill remaining cells
-        while (day % 7 !== 0) {
-          week.push(<td key={`empty-end-${day}`} className="calendar-day"></td>);
-          day++;
-        }
-        
-        calendar.push(<tr key={`week-${calendar.length}`}>{week}</tr>);
-        week = [];
-      }
-    }
-    
-    return calendar;
-  };
 
   // ฟังก์ชันสร้าง badge แสดงสถานะการจอง
   const getStatusBadge = (status) => {
@@ -683,28 +591,424 @@ function DashboardEmployee() {
         )
       );
 
-      alert(`✅ อัปเดตสถานะเป็น "${newStatus}" เรียบร้อยแล้ว`);
+      // เพิ่มการแจ้งเตือนเมื่ออัปเดตสำเร็จ
+      addNotification(`✅ อัปเดตสถานะการจองเป็น "${newStatus}" เรียบร้อยแล้ว`, 'success');
     } catch (error) {
       console.error("Error updating booking status:", error);
-      alert('❌ เกิดข้อผิดพลาดในการอัปเดตสถานะ');
+      addNotification(`❌ เกิดข้อผิดพลาดในการอัปเดตสถานะ`, 'error');
+    }
+  };
+
+  // ฟังก์ชันสำหรับรีเฟรชข้อมูลด้วยตัวเอง
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    addNotification('🔄 กำลังรีเฟรชข้อมูล...', 'info');
+    try {
+      // เรียกใช้ fetchData (ไม่ต้องส่งพารามิเตอร์)
+      const fetchData = async () => {
+        if (!user) return;
+  
+        try {
+          console.log('=== FETCHING EMPLOYEE DATA ===');
+          console.log('Current employee ID:', user.uid);
+          
+          // ดึงรายละเอียดของผู้ใช้งาน (พนักงาน)
+          const userQuery = query(
+            collection(db, 'artifacts/login-spa-7921d/users'),
+            where('__name__', '==', user.uid)
+          );
+          const userSnapshot = await getDocs(userQuery);
+          const userData = userSnapshot.docs[0]?.data();
+          setUserName(userData?.fullname || userData?.name || 'พนักงาน');
+          console.log('Employee name:', userData?.fullname || userData?.name || 'พนักงาน');
+  
+          // ดึงข้อมูลพนักงานจากคอลเลกชัน Staffs
+          const staffQuery = query(
+            collection(db, 'Staffs'),
+            where('userId', '==', user.uid)
+          );
+          const staffSnapshot = await getDocs(staffQuery);
+          
+          let staffData = null;
+          if (!staffSnapshot.empty) {
+            staffData = staffSnapshot.docs[0].data();
+            setEmployeeData(staffData);
+            console.log('Found staff data:', staffData);
+            
+            // Generate weekly and monthly schedules
+            const staffSchedules = staffData.schedules || [];
+            const weeklyData = generateWeeklySchedule(staffSchedules);
+            setWeeklySchedule(weeklyData);
+            
+            // Prefer phone from Users collection (userData) but fall back to staff record
+            try {
+              const phoneFromUser = userData?.phone;
+              const phoneFromStaff = staffData?.phone;
+              if (phoneFromUser) setEmployeePhone(phoneFromUser);
+              else if (phoneFromStaff) setEmployeePhone(phoneFromStaff);
+            } catch (err) {
+              console.error('Error setting employee phone from staff data:', err);
+            }
+          } else {
+            console.log('No staff data found');
+            // Still set phone from user document if available
+            try {
+              if (userData?.phone) setEmployeePhone(userData.phone);
+            } catch (err) {
+              console.error('Error setting employee phone from user data:', err);
+            }
+          }
+  
+          // ดึงการจองทั้งหมดที่เกี่ยวข้องกับพนักงานคนนี้ (ไม่กรองตามสถานะ)
+          console.log('Fetching bookings for employee:', user.uid);
+          let bookingsQuery = query(
+            collection(db, 'Bookings'),
+            where('employeeId', '==', user.uid)
+          );
+  
+          let approvedBookingsQuery = query(
+            collection(db, 'Bookings'),
+            where('status', '==', 'ยืนยันแล้ว')
+          );
+          
+          const bookingsSnapshot = await getDocs(bookingsQuery);
+          const approvedBookingsSnapshot = await getDocs(approvedBookingsQuery);
+          console.log(`Found ${bookingsSnapshot.size} direct bookings for employee`);
+          console.log(`Found ${approvedBookingsSnapshot.size} approved bookings total`);
+          
+          // รวมข้อมูลการจองทั้งที่กำหนดให้พนักงานคนนี้แล้ว และที่มีสถานะ "ยืนยันแล้ว"
+          const bookingsData = [];
+          const processedIds = new Set(); // เก็บ ID ที่ได้ประมวลผลไปแล้ว เพื่อป้องกันข้อมูลซ้ำ
+          
+          // เพิ่มข้อมูลการจองที่กำหนดให้พนักงานคนนี้ก่อน
+          for (const bookingDoc of bookingsSnapshot.docs) {
+            const data = bookingDoc.data();
+            const docId = bookingDoc.id;
+            
+            // จัดการกับข้อมูล timestamp อย่างปลอดภัย
+            let createdAtDate = new Date();
+            let bookingDate = null;
+            let dateISO = null;
+            let timeStr = '';
+            
+            // แปลงวันที่สร้างการจอง
+            try {
+              if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+                createdAtDate = data.createdAt.toDate();
+              } else if (data.createdAt instanceof Date) {
+                createdAtDate = data.createdAt;
+              } else if (data.createdAt) {
+                createdAtDate = new Date(data.createdAt);
+              }
+            } catch (e) {
+              console.error('Error converting timestamp for createdAt:', e);
+            }
+            
+            // แปลงวันที่การจอง (normalize เป็น Date และ ISO string)
+            const dateField = getBookingDate(data);
+            try {
+              if (dateField && typeof dateField.toDate === 'function') {
+                bookingDate = dateField.toDate();
+              } else if (dateField instanceof Date) {
+                bookingDate = dateField;
+              } else if (dateField) {
+                bookingDate = new Date(dateField);
+              }
+  
+              if (bookingDate && !Number.isNaN(bookingDate.getTime())) {
+                dateISO = bookingDate.toISOString().split('T')[0];
+              }
+            } catch (e) {
+              console.error('Error converting booking date:', e);
+            }
+  
+            // Normalize time string
+            timeStr = data.time || data.bookingTime || data.timeSlot || '';
+            
+            // ดึงชื่อลูกค้าจาก users collection
+            let customerName = data.customerName || 'ลูกค้า';
+            // ดึงชื่อบริการจาก Services collection ถ้ามีการเก็บเป็น serviceId หรือ service (string id)
+            let resolvedServiceName = data.service || data.serviceName || '';
+            try {
+              const serviceId = data.serviceId || (typeof data.service === 'string' ? data.service : null) || (data.service && data.service.id ? data.service.id : null);
+              if (serviceId) {
+                // check cache first
+                if (serviceCacheRef.current[serviceId]) {
+                  resolvedServiceName = serviceCacheRef.current[serviceId];
+                } else {
+                  const serviceDocRef = firestoreDoc(db, 'Services', serviceId);
+                  const serviceDoc = await getDoc(serviceDocRef);
+                  if (serviceDoc.exists()) {
+                    const serviceData = serviceDoc.data();
+                    if (serviceData && serviceData.name) {
+                      resolvedServiceName = serviceData.name;
+                      serviceCacheRef.current[serviceId] = serviceData.name; // cache it
+                      console.log('Resolved service from DB and cached:', serviceId, serviceData.name);
+                    }
+                  } else {
+                    console.log('Service doc not found for id:', serviceId);
+                  }
+                }
+              } else if (data.service && typeof data.service === 'object' && data.service.name) {
+                resolvedServiceName = data.service.name;
+              }
+            } catch (err) {
+              console.error('Error resolving service name for booking', docId, err);
+            }
+            if (data.userId) {
+              try {
+                const userDocRef = firestoreDoc(db, 'artifacts/login-spa-7921d/users', data.userId);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                  const userData = userDoc.data();
+                  customerName = userData.fullname || userData.name || userData.displayName || data.userEmail || 'ลูกค้า';
+                }
+              } catch (error) {
+                console.log('Error fetching customer name:', error);
+              }
+            }
+            
+            bookingsData.push({ 
+              id: docId, 
+              ...data,
+              customerName,
+              createdAt: createdAtDate,
+              // date in ISO yyyy-mm-dd for filtering/calendar
+              date: dateISO || (data.date ? (new Date(data.date).toISOString().split('T')[0]) : undefined),
+              // normalized time string
+              time: timeStr || data.time || data.bookingTime,
+              // normalizedDate as ISO datetime string for sorting
+              normalizedDate: bookingDate && !Number.isNaN(bookingDate.getTime()) ? bookingDate.toISOString() : (createdAtDate ? createdAtDate.toISOString() : null)
+            ,
+              serviceName: resolvedServiceName
+            });
+            
+            processedIds.add(docId); // เพิ่ม ID ที่ประมวลผลแล้ว
+          }
+          
+          // เพิ่มข้อมูลการจองที่มีสถานะ "ยืนยันแล้ว" และยังไม่ได้กำหนดพนักงาน
+          for (const approvedDoc of approvedBookingsSnapshot.docs) {
+            const data = approvedDoc.data();
+            const docId = approvedDoc.id;
+  
+            if (!processedIds.has(docId)) {
+              // ดึงชื่อลูกค้าจาก users collection
+              let customerName = data.customerName || 'ลูกค้า';
+              if (data.userId) {
+                try {
+                  const userDocRef = firestoreDoc(db, 'artifacts/login-spa-7921d/users', data.userId);
+                  const userDoc = await getDoc(userDocRef);
+                  if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    customerName = userData.fullname || userData.name || userData.displayName || data.userEmail || 'ลูกค้า';
+                  }
+                } catch (error) {
+                  console.log('Error fetching customer name:', error);
+                }
+              }
+  
+              // Normalize date/time for approved bookings as well
+              let approvedCreatedAt = new Date();
+              try {
+                if (data.createdAt && typeof data.createdAt.toDate === 'function') approvedCreatedAt = data.createdAt.toDate();
+                else if (data.createdAt instanceof Date) approvedCreatedAt = data.createdAt;
+                else if (data.createdAt) approvedCreatedAt = new Date(data.createdAt);
+              } catch (e) {
+                console.error('Error parsing approved createdAt:', e);
+              }
+  
+              let approvedBookingDate = null;
+              let approvedDateISO = null;
+              try {
+                const df = getBookingDate(data);
+                if (df && typeof df.toDate === 'function') approvedBookingDate = df.toDate();
+                else if (df instanceof Date) approvedBookingDate = df;
+                else if (df) approvedBookingDate = new Date(df);
+                if (approvedBookingDate && !Number.isNaN(approvedBookingDate.getTime())) approvedDateISO = approvedBookingDate.toISOString().split('T')[0];
+              } catch (e) {
+                console.error('Error converting approved booking date:', e);
+              }
+  
+              const approvedTimeStr = data.time || data.bookingTime || data.timeSlot || '';
+              // Resolve service name for approved bookings too
+              let approvedResolvedServiceName = data.service || data.serviceName || '';
+              try {
+                const serviceId = data.serviceId || (typeof data.service === 'string' ? data.service : null) || (data.service && data.service.id ? data.service.id : null);
+                if (serviceId) {
+                  if (serviceCacheRef.current[serviceId]) {
+                    approvedResolvedServiceName = serviceCacheRef.current[serviceId];
+                  } else {
+                    const serviceDocRef = firestoreDoc(db, 'Services', serviceId);
+                    const serviceDoc = await getDoc(serviceDocRef);
+                    if (serviceDoc.exists()) {
+                      const serviceData = serviceDoc.data();
+                      if (serviceData && serviceData.name) {
+                        approvedResolvedServiceName = serviceData.name;
+                        serviceCacheRef.current[serviceId] = serviceData.name;
+                        console.log('Resolved approved service from DB and cached:', serviceId, serviceData.name);
+                      }
+                    } else {
+                      console.log('Service doc not found for approved id:', serviceId);
+                    }
+                  }
+                } else if (data.service && typeof data.service === 'object' && data.service.name) {
+                  approvedResolvedServiceName = data.service.name;
+                }
+              } catch (err) {
+                console.error('Error resolving service name for approved booking', docId, err);
+              }
+  
+              bookingsData.push({
+                id: docId,
+                ...data,
+                customerName,
+                createdAt: approvedCreatedAt,
+                date: approvedDateISO || (data.date ? (new Date(data.date).toISOString().split('T')[0]) : undefined),
+                time: approvedTimeStr,
+                normalizedDate: approvedBookingDate && !Number.isNaN(approvedBookingDate.getTime()) ? approvedBookingDate.toISOString() : (approvedCreatedAt ? approvedCreatedAt.toISOString() : null)
+              ,
+                serviceName: approvedResolvedServiceName
+              });
+  
+              processedIds.add(docId);
+            }
+          }
+          
+          // Sort by normalizedDate (ISO datetime string) or createdAt fallback
+          const sortedData = bookingsData.sort((a, b) => {
+            const da = a.normalizedDate ? new Date(a.normalizedDate) : (a.createdAt ? new Date(a.createdAt) : new Date());
+            const db = b.normalizedDate ? new Date(b.normalizedDate) : (b.createdAt ? new Date(b.createdAt) : new Date());
+            return da - db;
+          });
+                
+          setAppointments(sortedData);
+          
+          // Filter today's appointments
+          const today = new Date().toISOString().split('T')[0];
+          const todaysAppts = sortedData.filter(appt => appt.date === today);
+          setTodayAppointments(todaysAppts);
+  
+          // Calculate total unique customers (filter out falsy values)
+          const uniqueCustomers = new Set(bookingsData.map(appt => appt.userEmail || appt.memberId || appt.userId).filter(Boolean)).size;
+            setTotalCustomers(uniqueCustomers);
+  
+          // ดึงรีวิวสำหรับพนักงานคนนี้
+          // ดึงรีวิวที่ employeeId ตรงกับ user.uid (ซึ่งตอนนี้ employeeId จะเป็น uid ของพนักงานเสมอ)
+          const reviewsQuery = query(
+            collection(db, 'Reviews'),
+            where('employeeId', '==', user.uid),
+            orderBy('createdAt', 'desc')
+          );
+          const reviewsSnapshot = await getDocs(reviewsQuery);
+          const reviewData = reviewsSnapshot.docs.map(revDoc => {
+            const data = revDoc.data();
+            return {
+              id: revDoc.id,
+              customerName: data.customerName || data.userEmail || 'ลูกค้า',
+              rating: data.rating || 5,
+              comment: data.comment || data.review || '',
+              service: data.service || 'บริการสปา',
+              date: data.createdAt?.toDate
+                ? data.createdAt.toDate().toLocaleDateString('th-TH')
+                : (data.date || ''),
+              userEmail: data.userEmail || '',
+              bookingId: data.bookingId || '',
+            };
+          });
+          setReviews(reviewData);
+  
+          // คำนวณคะแนนเฉลี่ย
+          if (reviewData.length > 0) {
+            const totalRating = reviewData.reduce((sum, review) => sum + review.rating, 0);
+            const avgRating = (totalRating / reviewData.length).toFixed(1);
+            setAverageRating(avgRating);
+          } else {
+            setAverageRating('0.0');
+          }
+  
+          setLoading(false);
+        } catch (error) {
+          console.error("Error fetching data:", error);
+        }
+      };
+      
+      // เก็บจำนวนรีวิวก่อนรีเฟรช
+      const reviewsCountBeforeRefresh = reviews.length;
+      
+      // เรียกใช้ fetchData
+      await fetchData();
+      
+      // ตรวจสอบว่ามีรีวิวใหม่หลังรีเฟรชหรือไม่
+      const newReviewsCount = reviews.length - reviewsCountBeforeRefresh;
+      if (newReviewsCount > 0) {
+        addNotification(`⭐ พบรีวิวใหม่ ${newReviewsCount} รายการจากการรีเฟรช`, 'success');
+      } else {
+        addNotification('✅ รีเฟรชข้อมูลเรียบร้อยแล้ว', 'success');
+      }
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      addNotification('❌ เกิดข้อผิดพลาดในการรีเฟรชข้อมูล', 'error');
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const handleLogout = async () => {
     if (window.confirm('คุณต้องการออกจากระบบหรือไม่?')) {
       try {
+        addNotification('กำลังออกจากระบบ...', 'info');
         await logout();
         navigate('/login');
       } catch (error) {
         console.error('Error logging out:', error);
-        alert('เกิดข้อผิดพลาดในการออกจากระบบ');
+        addNotification('❌ เกิดข้อผิดพลาดในการออกจากระบบ', 'error');
       }
     }
   };
 
   useEffect(() => {
     console.log('Appointments:', appointments);
+    
+    if (appointments.length > 0) {
+      // ตรวจสอบการจองที่มีวันที่วันนี้
+      const today = new Date().toISOString().split('T')[0];
+      const todayAppts = appointments.filter(appt => appt.date === today && appt.status === 'ยืนยันแล้ว');
+      
+      if (todayAppts.length > 0) {
+        addNotification(`📅 มีการจอง ${todayAppts.length} รายการในวันนี้`, 'info');
+      }
+    }
   }, [appointments]);
+  
+  // ตรวจสอบการเปลี่ยนแปลงของรีวิว
+  useEffect(() => {
+    // ตรวจสอบว่ามีรีวิวใหม่หรือไม่
+    if (reviews.length > 0 && prevReviewsCount > 0 && reviews.length > prevReviewsCount) {
+      const newReviewsCount = reviews.length - prevReviewsCount;
+      const latestReview = reviews[0]; // รีวิวล่าสุดจะอยู่บนสุดเพราะมีการเรียงลำดับโดยวันที่ล่าสุด
+
+      // แจ้งเตือนว่ามีรีวิวใหม่
+      if (newReviewsCount === 1) {
+        addNotification(
+          `⭐ คุณได้รับรีวิวใหม่ ${latestReview.rating} ดาว จากคุณ${latestReview.customerName}`,
+          'success'
+        );
+      } else if (newReviewsCount > 1) {
+        addNotification(
+          `⭐ คุณได้รับ ${newReviewsCount} รีวิวใหม่`,
+          'success'
+        );
+      }
+    }
+    
+    // อัปเดตจำนวนรีวิวเพื่อใช้เปรียบเทียบในครั้งต่อไป
+    setPrevReviewsCount(reviews.length);
+    
+    // แจ้งเตือนครั้งแรกที่โหลดเพจ ถ้ามีรีวิว
+    if (prevReviewsCount === 0 && reviews.length > 0) {
+      addNotification(`⭐ คุณมีรีวิวทั้งหมด ${reviews.length} รายการ และคะแนนเฉลี่ย ${averageRating}`, 'info');
+    }
+  }, [reviews, prevReviewsCount, averageRating]);
 
   return (
     <div className="d-flex vh-100 bg-light">
@@ -715,6 +1019,8 @@ function DashboardEmployee() {
       
       <style>
         {`
+          /* Make appointment filter buttons stand out with shadow and strong border */
+          /* ...existing code... */
           .sidebar {
             width: ${sidebarCollapsed ? '80px' : '280px'};
             transition: width 0.3s ease;
@@ -1442,6 +1748,148 @@ function DashboardEmployee() {
 
       {/* Main Content */}
       <div className="main-content" style={{ background: '#faf8f0ff' }}>
+        {/* ปุ่มแจ้งเตือน */}
+        <div className="notification-container" style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 9999 }}>
+          <button 
+            className="notification-button btn" 
+            onClick={() => setShowNotifications(!showNotifications)}
+            style={{ 
+              backgroundColor: '#ff7730', 
+              color: 'white',
+              borderRadius: '50%', 
+              width: '48px', 
+              height: '48px',
+              display: 'flex',
+              alignItems: 'center', 
+              justifyContent: 'center',
+              boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)',
+              position: 'relative'
+            }}
+          >
+            <i className="fas fa-bell"></i>
+            {unreadCount > 0 && (
+              <span style={{ 
+                position: 'absolute', 
+                top: '-5px', 
+                right: '-5px',
+                background: 'red',
+                color: 'white',
+                borderRadius: '50%',
+                minWidth: '18px',
+                height: '18px',
+                fontSize: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold'
+              }}>
+                {unreadCount}
+              </span>
+            )}
+          </button>
+          
+          {showNotifications && (
+            <div 
+              className="notifications-dropdown" 
+              style={{
+                position: 'absolute',
+                top: '60px',
+                right: '0',
+                width: '350px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                background: 'white',
+                borderRadius: '12px',
+                boxShadow: '0px 8px 20px rgba(0, 0, 0, 0.15)',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                zIndex: 9999
+              }}
+            >
+              <div className="notification-header" style={{ 
+                padding: '12px 16px', 
+                background: 'linear-gradient(135deg, #ff9900 0%, #ff7730 100%)',
+                color: 'white',
+                borderTopLeftRadius: '12px',
+                borderTopRightRadius: '12px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <h6 style={{ margin: 0, fontWeight: 'bold' }}>
+                  <i className="fas fa-bell me-2"></i> การแจ้งเตือน
+                </h6>
+                <div>
+                  <button 
+                    className="btn btn-sm text-white" 
+                    onClick={markAllAsRead}
+                    style={{ fontSize: '0.8rem', padding: '2px 8px' }}
+                  >
+                    <i className="fas fa-check-double"></i> อ่านทั้งหมด
+                  </button>
+                  <button 
+                    className="btn btn-sm text-white ms-1" 
+                    onClick={clearNotifications}
+                    style={{ fontSize: '0.8rem', padding: '2px 8px' }}
+                  >
+                    <i className="fas fa-trash"></i> ล้างทั้งหมด
+                  </button>
+                </div>
+              </div>
+              
+              <div className="notification-body" style={{ padding: '0', maxHeight: '320px', overflowY: 'auto' }}>
+                {notifications.length === 0 ? (
+                  <div className="text-center py-4">
+                    <i className="fas fa-bell-slash mb-2" style={{ fontSize: '1.5rem', color: '#6c757d' }}></i>
+                    <p className="text-muted mb-0">ไม่มีการแจ้งเตือนใหม่</p>
+                  </div>
+                ) : (
+                  notifications.map(notification => (
+                    <div 
+                      key={notification.id}
+                      className="notification-item"
+                      style={{
+                        padding: '12px 16px',
+                        borderBottom: '1px solid #eee',
+                        backgroundColor: notification.read ? '#fff' : 'rgba(255, 119, 48, 0.05)',
+                        position: 'relative',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <div className="d-flex align-items-start">
+                        <div className="notification-icon me-3" style={{ marginTop: '2px' }}>
+                          {notification.type === 'success' && <i className="fas fa-check-circle" style={{ color: '#28a745' }}></i>}
+                          {notification.type === 'error' && <i className="fas fa-exclamation-circle" style={{ color: '#dc3545' }}></i>}
+                          {notification.type === 'info' && <i className="fas fa-info-circle" style={{ color: '#17a2b8' }}></i>}
+                          {notification.type === 'warning' && <i className="fas fa-exclamation-triangle" style={{ color: '#ffc107' }}></i>}
+                        </div>
+                        <div className="notification-content" style={{ flex: 1 }}>
+                          <div className="notification-message" style={{ fontSize: '0.9rem' }}>{notification.message}</div>
+                          <div className="notification-time" style={{ fontSize: '0.75rem', color: '#6c757d', marginTop: '4px' }}>
+                            <i className="fas fa-clock me-1"></i> {notification.time}
+                          </div>
+                        </div>
+                      </div>
+                      {!notification.read && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: '#ff7730'
+                          }}
+                        ></span>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Employee Profile Header */}
         <div className="employee-profile-header">
           <div className="profile-card">
@@ -1535,6 +1983,36 @@ function DashboardEmployee() {
                       <i className="fas fa-chevron-right ms-1"></i>
                     </button>
                   </div>
+
+                  {/* Refresh Button */}
+                  <button 
+                    className="btn btn-sm" 
+                    onClick={handleManualRefresh}
+                    disabled={isRefreshing}
+                    style={{
+                      backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                      color: '#ff7730',
+                      border: '1px solid #ff7730',
+                      borderRadius: '20px',
+                      padding: '5px 15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    title="รีเฟรชข้อมูล"
+                  >
+                    {isRefreshing ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span className="ms-1">กำลังรีเฟรช...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-sync-alt"></i>
+                        <span className="ms-1">รีเฟรชข้อมูล</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1662,39 +2140,24 @@ function DashboardEmployee() {
                   <div className="btn-group" role="group">
                     <button 
                       type="button" 
-                      className={`btn btn-sm ${appointmentFilter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
+                      className={`filter-btn-all btn me-2 ${appointmentFilter === 'all' ? 'active' : ''}`}
                       onClick={() => setAppointmentFilter('all')}
-                      style={{ 
-                        backgroundColor: appointmentFilter === 'all' ? '#007bff' : 'transparent',
-                        borderColor: '#007bff',
-                        color: appointmentFilter === 'all' ? 'white' : '#007bff'
-                      }}
                     >
                       <i className="fas fa-list me-1"></i>
                       ทั้งหมด
                     </button>
                     <button 
                       type="button" 
-                      className={`btn btn-sm ${appointmentFilter === 'ongoing' ? 'btn-warning' : 'btn-outline-warning'}`}
+                      className={`filter-btn-ongoing btn me-2 ${appointmentFilter === 'ongoing' ? 'active' : ''}`}
                       onClick={() => setAppointmentFilter('ongoing')}
-                      style={{ 
-                        backgroundColor: appointmentFilter === 'ongoing' ? '#ffc107' : 'transparent',
-                        borderColor: '#ffc107',
-                        color: appointmentFilter === 'ongoing' ? '#212529' : '#ffc107'
-                      }}
                     >
                       <i className="fas fa-clock me-1"></i>
                       กำลังจอง
                     </button>
                     <button 
                       type="button" 
-                      className={`btn btn-sm ${appointmentFilter === 'completed' ? 'btn-success' : 'btn-outline-success'}`}
+                      className={`filter-btn-completed btn me-2 ${appointmentFilter === 'completed' ? 'active' : ''}`}
                       onClick={() => setAppointmentFilter('completed')}
-                      style={{ 
-                        backgroundColor: appointmentFilter === 'completed' ? '#28a745' : 'transparent',
-                        borderColor: '#28a745',
-                        color: appointmentFilter === 'completed' ? 'white' : '#28a745'
-                      }}
                     >
                       <i className="fas fa-check-circle me-1"></i>
                       เสร็จสิ้น
@@ -1714,6 +2177,36 @@ function DashboardEmployee() {
                      appointmentFilter === 'ongoing' ? `กำลังจอง ${appointments.filter(a => a.status !== 'เสร็จสิ้น').length}` :
                      `เสร็จสิ้น ${appointments.filter(a => a.status === 'เสร็จสิ้น').length}`} รายการ
                   </span>
+                  
+                  {/* Refresh Button */}
+                  <button 
+                    className="btn btn-sm" 
+                    onClick={handleManualRefresh}
+                    disabled={isRefreshing}
+                    style={{
+                      backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                      color: '#ff7730',
+                      border: '1px solid #ff7730',
+                      borderRadius: '20px',
+                      padding: '5px 15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    title="รีเฟรชข้อมูล"
+                  >
+                    {isRefreshing ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span className="ms-1">กำลังรีเฟรช...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-sync-alt"></i>
+                        <span className="ms-1">รีเฟรชข้อมูล</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1916,7 +2409,7 @@ function DashboardEmployee() {
                   <i className="fas fa-star me-2"></i>
                   รีวิวและคะแนนการให้บริการ
                 </h4>
-                <div className="d-flex align-items-center">
+                <div className="d-flex align-items-center gap-3">
                   <div className="star-rating me-2">
                     {[1, 2, 3, 4, 5].map(star => (
                       <i 
@@ -1926,6 +2419,36 @@ function DashboardEmployee() {
                     ))}
                   </div>
                   <span className="badge-custom" style={{ background: '#ffc107', color: '#2c2c2c' }}>{averageRating} / 5.0</span>
+                  
+                  {/* Refresh Button */}
+                  <button 
+                    className="btn btn-sm" 
+                    onClick={handleManualRefresh}
+                    disabled={isRefreshing}
+                    style={{
+                      backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                      color: '#ff7730',
+                      border: '1px solid #ff7730',
+                      borderRadius: '20px',
+                      padding: '5px 15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    title="รีเฟรชข้อมูล"
+                  >
+                    {isRefreshing ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span className="ms-1">กำลังรีเฟรช...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-sync-alt"></i>
+                        <span className="ms-1">รีเฟรชข้อมูล</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

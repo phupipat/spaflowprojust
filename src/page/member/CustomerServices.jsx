@@ -1954,7 +1954,7 @@ function CustomerServices() {
                             </>
                           ) : (
                             <>
-                              <i className="fas fa-check me-2"></i>ยืนยันการชำระเงิน
+                              <i className="fas fa-check me-2"></i>ยืนยันการจองบริการทั้งหมด
                             </>
                           )}
                         </button>

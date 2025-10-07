@@ -165,7 +165,7 @@ function PromotionAdd() {
         <button
           type="button"
           className="btn btn-lg btn-brown d-flex align-items-center px-4 py-2"
-          style={{ background: '#7c4d1e', color: '#fff', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+          style={{ borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
           onClick={() => setShowAddForm(!showAddForm)}
         >
           <i className={`fas ${showAddForm ? 'fa-minus' : 'fa-plus'} me-2`}></i> {showAddForm ? 'ปิดฟอร์มเพิ่มโปรโมชั่น' : 'เพิ่มโปรโมชั่นใหม่'}
@@ -202,7 +202,7 @@ function PromotionAdd() {
           </div>
           <div className="d-flex justify-content-end gap-2">
             {editId && <button type="button" className="btn btn-secondary" onClick={() => { setEditId(null); setEditData({ name: '', description: '', pointsCost: 0, type: 'discount', value: '', validity: 30 }); }}>ยกเลิก</button>}
-            <button type="submit" className={`btn ${editId ? 'btn-warning' : 'btn-primary'}`} disabled={loading}>
+            <button type="submit" className={`btn ${editId ? 'btn-warning' : 'btn-brown'}`} disabled={loading}>
               <i className={`fas ${editId ? 'fa-save' : 'fa-plus'} me-2`}></i>
               {loading ? 'กำลังบันทึก...' : editId ? 'บันทึกการแก้ไข' : 'เพิ่มโปรโมชั่น'}
             </button>
@@ -221,7 +221,8 @@ function PromotionAdd() {
             )}
           </div>
           <button 
-            className="btn btn-outline-primary" 
+            className="btn btn-outline-secondary" 
+            style={{ borderColor: '#7B4019', color: '#7B4019' }}
             onClick={fetchPromotions} 
             disabled={fetchLoading}
           >
@@ -235,21 +236,21 @@ function PromotionAdd() {
             <div className="btn-group" role="group" aria-label="Filter promotions">
               <button 
                 type="button" 
-                className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className={`btn ${filter === 'all' ? 'btn-brown' : 'btn-outline-secondary'}`}
                 onClick={() => setFilter('all')}
               >
                 ทั้งหมด
               </button>
               <button 
                 type="button" 
-                className={`btn ${filter === 'discount' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className={`btn ${filter === 'discount' ? 'btn-brown' : 'btn-outline-secondary'}`}
                 onClick={() => setFilter('discount')}
               >
                 <i className="fas fa-percent me-1"></i> ส่วนลด
               </button>
               <button 
                 type="button" 
-                className={`btn ${filter === 'freeService' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className={`btn ${filter === 'freeService' ? 'btn-brown' : 'btn-outline-secondary'}`}
                 onClick={() => setFilter('freeService')}
               >
                 <i className="fas fa-gift me-1"></i> บริการฟรี
