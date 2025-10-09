@@ -526,26 +526,6 @@ function CustomerServices() {
         batch.set(pointHistoryRef, pointHistoryData);
       }
 
-      // เพิ่มแต้มรีวิวหลังใช้บริการ 5 แต้ม (เมื่อ reviewed = true)
-      // ตัวอย่าง: สามารถเรียกใช้ logic นี้หลังจากรีวิวจริง หรือในจุดที่ reviewed ถูกเปลี่ยนเป็น true
-      // for (const item of cartItems) {
-      //   if (item.reviewed) {
-      //     const reviewPointId = `PH${Math.floor(100000 + Math.random() * 900000)}`;
-      //     const reviewPointRef = doc(db, 'PointHistory', reviewPointId);
-      //     batch.set(reviewPointRef, {
-      //       userId: user.uid,
-      //       userEmail: user.email,
-      //       points: 5,
-      //       type: 'REVIEW',
-      //       source: 'REVIEW',
-      //       serviceId: item.service.id,
-      //       reason: `ได้รับแต้มจากการรีวิวสินค้า/บริการ ${item.service.name}`,
-      //       status: 'ACTIVE',
-      //       createdAt: Timestamp.now()
-      //     });
-      //   }
-      // }
-
       // Commit batch transaction
       await batch.commit();
       

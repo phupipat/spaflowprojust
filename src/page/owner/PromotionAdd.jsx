@@ -2,7 +2,7 @@
   import { db } from '../../Firebase';
   import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 
-// Custom CSS for the component
+// CSS กำหนดสไตล์สำหรับคอมโพเนนต์นี้
 const cardStyles = {
   promotionCard: {
     transition: 'transform 0.3s ease, box-shadow 0.3s ease',
@@ -29,11 +29,11 @@ const cardStyles = {
 };
 
 function PromotionAdd() {
-  // State สำหรับแก้ไขคูปอง
+  // สเตตสำหรับแก้ไขคูปอง
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({ name: '', description: '', pointsCost: 0, type: 'discount', value: '', validity: 30 });
 
-  // ฟังก์ชันเริ่มแก้ไขคูปอง
+  // ฟังก์ชันสำหรับเริ่มแก้ไขคูปอง
   const startEdit = (promotion) => {
     setEditId(promotion.id || promotion.uid);
     setEditData({
@@ -47,7 +47,7 @@ function PromotionAdd() {
     setShowAddForm(true);
   };
 
-  // ฟังก์ชันบันทึกการแก้ไขคูปอง
+  // ฟังก์ชันสำหรับบันทึกการแก้ไขคูปอง
   const handleEdit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -73,7 +73,7 @@ function PromotionAdd() {
     setLoading(false);
   };
 
-  // ฟังก์ชันลบคูปอง
+  // ฟังก์ชันสำหรับลบคูปอง
   const handleDelete = async (id) => {
     if (!window.confirm('ต้องการลบโปรโมชั่นนี้ใช่หรือไม่?')) return;
     setLoading(true);
@@ -130,7 +130,7 @@ function PromotionAdd() {
       setType('discount');
       setValue('');
       setValidity(30);
-      // Fetch updated promotions
+  // ดึงข้อมูลโปรโมชั่นล่าสุดหลังเพิ่ม
       fetchPromotions();
     } catch (err) {
       setError('เกิดข้อผิดพลาด');
@@ -138,6 +138,7 @@ function PromotionAdd() {
     setLoading(false);
   };
 
+  // ฟังก์ชันสำหรับดึงข้อมูลโปรโมชั่นทั้งหมด
   const fetchPromotions = async () => {
     setFetchLoading(true);
     try {

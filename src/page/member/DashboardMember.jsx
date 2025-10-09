@@ -41,14 +41,14 @@ function DashboardMember() {
     setNotification({ show: false, title: '', message: '', type: 'info' });
   };
 
-  // Helper: แปลงสถานะดิบเป็นสถานะสำหรับแสดงผล
+  // ตัวช่วย: แปลงสถานะดิบเป็นสถานะที่ใช้แสดงผล
   const getDisplayStatus = (status) => {
     if (!status) return 'ไม่ระบุ';
     if (status === 'จองแล้ว' || status === 'รอยืนยัน' || status === 'รอชำระเงิน') return 'กำลังดำเนินการ';
     return status;
   };
 
-  // Helper: เลือก class ของ badge ตามสถานะดิบ
+  // ตัวช่วย: เลือกคลาสของ badge ตามสถานะดิบ
   const getStatusClass = (status) => {
     if (!status) return 'status-default';
     if (status === 'เสร็จสิ้น') return 'status-completed';
@@ -58,7 +58,7 @@ function DashboardMember() {
     return 'status-default';
   };
 
-  // Helper: ตรวจสอบว่าเป็น ongoing (รวมกรณีที่เราจะแสดง 'กำลังดำเนินการ')
+  // ตัวช่วย: ตรวจสอบว่าเป็น ongoing (รวมกรณีที่ต้องแสดง 'กำลังดำเนินการ')
   const isOngoing = (status) => {
     if (!status) return false;
     return ['จองแล้ว', 'รอยืนยัน', 'รอชำระเงิน', 'ยืนยันแล้ว', 'กำลังให้บริการ'].includes(status);
@@ -379,8 +379,8 @@ function DashboardMember() {
     return () => clearInterval(interval);
   }, [user, fetchData]);
 
-  // TODO: This function is currently unused but kept for potential future implementation
-  // Consider removing if not needed in the future or implementing where appropriate
+  // หมายเหตุ: ฟังก์ชันนี้ยังไม่ได้ใช้งาน แต่เก็บไว้เผื่อจะนำไปใช้ในอนาคต
+  // พิจารณาลบออกหากไม่จำเป็น หรือปรับใช้ให้เหมาะสม
   const handleCompleteBooking = async (bookingId) => {
     try {
       await updateDoc(doc(db, 'Bookings', bookingId), { status: 'เสร็จสิ้น' });
@@ -1322,16 +1322,7 @@ function DashboardMember() {
                                 <div className="detail-icon">
                                   <i className="fas fa-money-bill-wave"></i>
                                 </div>
-                                {b.discount && b.discount > 0 ? (
-                                  <span>
-                                    <span className="text-decoration-line-through text-muted me-1" style={{ fontSize: '0.75rem' }}>
-                                      {Number(b.price || b.cost || b.amount || 0).toLocaleString()}
-                                    </span>
-                                    {Number((b.price || b.cost || b.amount || 0) - b.discount).toLocaleString()} บาท
-                                  </span>
-                                ) : (
-                                  <span>{Number(b.price || b.cost || b.amount || 0).toLocaleString()} บาท</span>
-                                )}
+                                <span>{Number(b.price || b.cost || b.amount || 1690).toLocaleString()} บาท</span>
                               </div>
                             </div>
 

@@ -573,7 +573,7 @@ function DashboardEmployee() {
           ...updateData,
           completedAt: new Date(),
           canReview: true, // เปิดให้ลูกค้ารีวิว
-          reviewAvailable: true // เพิ่มฟิลด์นี้เพื่อให้แน่ใจ
+          // reviewAvailable: true // ยกเลิกการใช้ reviewAvailable ใช้ canReview อย่างเดียว
         };
         
         console.log('Setting completed status with data:', updateData);

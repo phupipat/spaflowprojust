@@ -134,7 +134,7 @@ function UserApproval() {
       if (user.email) {
         // สร้างเทมเพลตอีเมลที่เหมาะสมตามบทบาทของผู้ใช้
         const isEmployee = user.role === 'employee';
-        const loginLink = 'https://spa-flow.web.app/login'; // ลิงค์เข้าสู่ระบบ (ปรับตาม URL จริงของโปรเจค)
+        const loginLink = 'https://login-spa-7921d.web.app/login'; // ลิงค์เข้าสู่ระบบ (ปรับตาม URL จริงของโปรเจค)
 
         // สร้างหัวเรื่องอีเมลตามบทบาทของผู้ใช้
         const emailSubject = isEmployee 
@@ -145,24 +145,24 @@ function UserApproval() {
         const emailContent = isEmployee
           ? `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+              <div style="background: linear-gradient(135deg, #7B4019 0%, #FFB84C 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
                 <h1 style="margin: 0; font-size: 24px;">🎉 ยินดีต้อนรับสู่ทีมงาน SpaFlow!</h1>
               </div>
               <div style="padding: 30px; background: #f8f9fa; border-radius: 0 0 10px 10px;">
-                <h2 style="color: #333; margin-bottom: 20px;">สวัสดีคุณ ${user.fullname || user.name || 'พนักงานใหม่'},</h2>
-                <p style="color: #555; font-size: 16px;">เรามีความยินดีที่จะแจ้งให้ทราบว่า <strong>บัญชีพนักงาน</strong> ของคุณสำหรับ <strong>SpaFlow</strong> ได้รับการอนุมัติเรียบร้อยแล้ว!</p>
+                <h2 style="color: #7B4019; margin-bottom: 20px;">สวัสดีคุณ ${user.fullname || user.name || 'พนักงานใหม่'},</h2>
+                <p style="color: #7B4019; font-size: 16px;">เรามีความยินดีที่จะแจ้งให้ทราบว่า <strong>บัญชีพนักงาน</strong> ของคุณสำหรับ <strong>SpaFlow</strong> ได้รับการอนุมัติเรียบร้อยแล้ว!</p>
                 
-                <div style="background: #e8f0ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3a7bd5;">
-                  <p style="margin-top: 0; color: #333; font-weight: bold;">✓ คุณสามารถเข้าสู่ระบบได้แล้วตอนนี้</p>
-                  <p style="margin-bottom: 10px; color: #444;">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณได้ลงทะเบียนไว้:</p>
+                <div style="background: #FFF3E0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #7B4019;">
+                  <p style="margin-top: 0; color: #7B4019; font-weight: bold;">✓ คุณสามารถเข้าสู่ระบบได้แล้วตอนนี้</p>
+                  <p style="margin-bottom: 10px; color: #7B4019;">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณได้ลงทะเบียนไว้:</p>
                   <div style="text-align: center; margin: 15px 0;">
-                    <a href="${loginLink}" style="background-color: #3a7bd5; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">เข้าสู่ระบบตอนนี้</a>
+                    <a href="${loginLink}" style="background-color: #7B4019; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">เข้าสู่ระบบตอนนี้</a>
                   </div>
                 </div>
 
-                <div style="background: #f0f5fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                  <p style="margin: 0; color: #333; font-weight: bold;">⚡ ในระบบพนักงาน คุณสามารถ:</p>
-                  <ul style="color: #444; margin: 10px 0;">
+                <div style="background: #FFF8E1; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                  <p style="margin: 0; color: #7B4019; font-weight: bold;">⚡ ในระบบพนักงาน คุณสามารถ:</p>
+                  <ul style="color: #7B4019; margin: 10px 0;">
                     <li>ดูตารางงานประจำวันของคุณ</li>
                     <li>ตรวจสอบข้อมูลการจองที่ได้รับมอบหมาย</li>
                     <li>จัดการโปรไฟล์ส่วนตัว</li>
@@ -170,34 +170,34 @@ function UserApproval() {
                   </ul>
                 </div>
                 
-                <p style="color: #555;">หากคุณมีคำถามหรือต้องการความช่วยเหลือในการใช้งานระบบ โปรดติดต่อผู้จัดการของคุณได้โดยตรง</p>
-                <p style="color: #555; font-weight: bold;">เราดีใจที่ได้คุณมาร่วมเป็นส่วนหนึ่งของทีม และหวังว่าจะได้ร่วมงานกันอย่างราบรื่น!</p>
+                <p style="color: #7B4019;">หากคุณมีคำถามหรือต้องการความช่วยเหลือในการใช้งานระบบ โปรดติดต่อผู้จัดการของคุณได้โดยตรง</p>
+                <p style="color: #7B4019; font-weight: bold;">เราดีใจที่ได้คุณมาร่วมเป็นส่วนหนึ่งของทีม และหวังว่าจะได้ร่วมงานกันอย่างราบรื่น!</p>
                 
-                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
-                <p style="color: #777; font-size: 14px;">ขอแสดงความนับถือ,<br><strong>ทีมงาน SpaFlow</strong></p>
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #FFB84C;">
+                <p style="color: #7B4019; font-size: 14px;">ขอแสดงความนับถือ,<br><strong>ทีมงาน SpaFlow</strong></p>
               </div>
             </div>
           `
           : `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #eac966ff 0%, #732400ff 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+              <div style="background: linear-gradient(135deg, #FFB84C 0%, #7B4019 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
                 <h1 style="margin: 0; font-size: 24px;">🎉 ยินดีต้อนรับสู่ SpaFlow!</h1>
               </div>
               <div style="padding: 30px; background: #f8f9fa; border-radius: 0 0 10px 10px;">
-                <h2 style="color: #333; margin-bottom: 20px;">สวัสดีคุณ ${user.fullname || user.name || 'สมาชิกใหม่'},</h2>
-                <p style="color: #555; font-size: 16px;">เรามีความยินดีที่จะแจ้งให้ทราบว่า <strong>บัญชีสมาชิก</strong> ของคุณสำหรับ <strong>SpaFlow</strong> ได้รับการอนุมัติเรียบร้อยแล้ว!</p>
+                <h2 style="color: #7B4019; margin-bottom: 20px;">สวัสดีคุณ ${user.fullname || user.name || 'สมาชิกใหม่'},</h2>
+                <p style="color: #7B4019; font-size: 16px;">เรามีความยินดีที่จะแจ้งให้ทราบว่า <strong>บัญชีสมาชิก</strong> ของคุณสำหรับ <strong>SpaFlow</strong> ได้รับการอนุมัติเรียบร้อยแล้ว!</p>
                 
-                <div style="background: #f7e8ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #764ba2;">
-                  <p style="margin-top: 0; color: #333; font-weight: bold;">✓ คุณสามารถเข้าสู่ระบบได้แล้วตอนนี้</p>
-                  <p style="margin-bottom: 10px; color: #444;">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณได้ลงทะเบียนไว้:</p>
+                <div style="background: #FFF3E0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FFB84C;">
+                  <p style="margin-top: 0; color: #7B4019; font-weight: bold;">✓ คุณสามารถเข้าสู่ระบบได้แล้วตอนนี้</p>
+                  <p style="margin-bottom: 10px; color: #7B4019;">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณได้ลงทะเบียนไว้:</p>
                   <div style="text-align: center; margin: 15px 0;">
-                    <a href="${loginLink}" style="background-color: #764ba2; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">เข้าสู่ระบบตอนนี้</a>
+                    <a href="${loginLink}" style="background-color: #7B4019; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">เข้าสู่ระบบตอนนี้</a>
                   </div>
                 </div>
 
-                <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                  <p style="margin: 0; color: #2d5a2d; font-weight: bold;">✅ ในฐานะสมาชิกของเรา คุณสามารถ:</p>
-                  <ul style="color: #2d5a2d; margin: 10px 0;">
+                <div style="background: #FFF8E1; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                  <p style="margin: 0; color: #7B4019; font-weight: bold;">✅ ในฐานะสมาชิกของเรา คุณสามารถ:</p>
+                  <ul style="color: #7B4019; margin: 10px 0;">
                     <li>จองบริการสปาออนไลน์ได้ทันที</li>
                     <li>รับสิทธิพิเศษและส่วนลดสำหรับสมาชิก</li>
                     <li>ดูประวัติการจองและสะสมแต้ม</li>
@@ -205,11 +205,11 @@ function UserApproval() {
                   </ul>
                 </div>
                 
-                <p style="color: #555;">ขอขอบคุณที่เลือกใช้บริการกับเรา เราหวังว่าคุณจะได้รับประสบการณ์ที่ดีที่สุดจากบริการสปาของเรา</p>
-                <p style="color: #555; font-style: italic;">พบกับโปรโมชั่นพิเศษสำหรับสมาชิกใหม่! จองบริการครั้งแรกรับส่วนลด 10% ภายใน 7 วัน</p>
+                <p style="color: #7B4019;">ขอขอบคุณที่เลือกใช้บริการกับเรา เราหวังว่าคุณจะได้รับประสบการณ์ที่ดีที่สุดจากบริการสปาของเรา</p>
+                <p style="color: #7B4019; font-style: italic;">พบกับโปรโมชั่นพิเศษสำหรับสมาชิกใหม่! จองบริการครั้งแรกรับส่วนลด 10% ภายใน 7 วัน</p>
                 
-                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
-                <p style="color: #777; font-size: 14px;">ขอแสดงความนับถือ,<br><strong>ทีมงาน SpaFlow</strong></p>
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #FFB84C;">
+                <p style="color: #7B4019; font-size: 14px;">ขอแสดงความนับถือ,<br><strong>ทีมงาน SpaFlow</strong></p>
               </div>
             </div>
           `;

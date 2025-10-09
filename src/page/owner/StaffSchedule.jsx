@@ -1052,11 +1052,15 @@ function StaffSchedule() {
                         <td>
                           <div className="d-flex align-items-center">
                             <div className="icon-circle me-2" style={{ 
-                              backgroundColor: 'rgba(255, 153, 0, 0.1)',
+                              backgroundColor: '#ff9900',
                               width: '40px',
-                              height: '40px'
+                              height: '40px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
-                              <i className="fas fa-user" style={{ color: '#ff9900' }}></i>
+                              <i className="fas fa-user" style={{ color: '#fff', fontSize: '1.3rem' }}></i>
                             </div>
                             <div>
                               <div className="fw-bold">{staff.name}</div>

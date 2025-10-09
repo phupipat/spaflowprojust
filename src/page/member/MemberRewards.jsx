@@ -161,7 +161,7 @@ function MemberRewards() {
       validUntil.setFullYear(validUntil.getFullYear() + 100); // เพิ่มไป 100 ปี
 
       // สร้างรหัสแลกรางวัลในรูปแบบ PH ตามด้วยตัวเลข
-      const rewardCode = generateRewardCode();
+      const rewardCode = await generateRewardCode();
       
       const redemptionData = {
         userId: user.uid,
@@ -227,10 +227,26 @@ function MemberRewards() {
   };
 
   // ฟังก์ชันสร้างรหัสแลกรางวัลในรูปแบบ PH ตามด้วยตัวเลข
-  const generateRewardCode = () => {
-    // สร้างตัวเลขสุ่ม 6 หลัก
-    const randomDigits = Math.floor(100000 + Math.random() * 900000);
-    return `PH${randomDigits}`;
+  const generateRewardCode = async () => {
+    let code = '';
+    let isUnique = false;
+    
+    while (!isUnique) {
+      // สร้างตัวเลขสุ่ม 6 หลัก
+      const randomDigits = Math.floor(100000 + Math.random() * 900000);
+      code = `PH${randomDigits}`;
+      
+      // ตรวจสอบว่ารหัสนี้มีอยู่แล้วในฐานข้อมูลหรือไม่
+      const q = query(collection(db, 'Redemptions'), where('rewardCode', '==', code));
+      const snap = await getDocs(q);
+      
+      // ถ้าไม่มีรหัสซ้ำในฐานข้อมูล
+      if (snap.empty) {
+        isUnique = true;
+      }
+    }
+    
+    return code;
   };
 
   if (loading) {
@@ -452,7 +468,7 @@ function MemberRewards() {
                       fontFamily: 'monospace', 
                       fontWeight: '600',
                       letterSpacing: '1px'
-                    }}>{redemption.rewardCode || 'PH000000'}</td>
+                    }}>{redemption.id}</td>
                     <td>{redemption.pointsUsed} แต้ม</td>
                     <td>{formatDate(redemption.redeemedAt)}</td>
                     <td>{formatDate(redemption.validUntil)}</td>

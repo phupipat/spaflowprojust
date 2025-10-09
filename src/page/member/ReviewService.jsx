@@ -364,6 +364,12 @@ function ReviewService() {
         comment: comment || '(ไม่มีความคิดเห็น)'
       });
 
+
+      // สร้าง ReviewID เป็น RV ตามด้วยเลขสุ่ม 6 หลัก และเวลาปัจจุบัน (ย้ายขึ้นก่อน)
+      const timestamp = new Date().getTime();
+      const randomNum = Math.floor(100000 + Math.random() * 900000);
+      const reviewId = `RV${randomNum}-${timestamp}`;
+
       // อัปเดตข้อมูลการจองหลังรีวิว: เก็บเฉพาะ canReview, reviewsId, reviewedAt
       try {
         const bookingRef = doc(db, 'Bookings', bookingId);
@@ -389,11 +395,6 @@ function ReviewService() {
         console.error('❌ เกิดข้อผิดพลาดในการอัพเดทข้อมูลการจอง:', bookingUpdateError);
         console.warn('⚠️ พบปัญหาในการอัพเดทข้อมูลการจอง แต่จะดำเนินการต่อ');
       }
-
-      // สร้าง ReviewID เป็น RV ตามด้วยเลขสุ่ม 6 หลัก และเวลาปัจจุบัน
-      const timestamp = new Date().getTime();
-      const randomNum = Math.floor(100000 + Math.random() * 900000);
-      const reviewId = `RV${randomNum}-${timestamp}`;
 
       // สร้างข้อมูลรีวิวที่สมบูรณ์
       // ดึงข้อมูลลูกค้าจาก /artifacts/login-spa-7921d/users

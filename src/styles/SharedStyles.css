@@ -1,3 +1,16 @@
+/* ปุ่มกรอบน้ำตาลสำหรับปุ่มจัดตารางงาน */
+.btn-outline-brown {
+  color: #b97b3e;
+  border: 1.5px solid #b97b3e;
+  background: #fff;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.btn-outline-brown:hover, .btn-outline-brown:focus, .btn-outline-brown:active {
+  background: linear-gradient(90deg, #b97b3e 0%, #7B4019 100%);
+  color: #fff;
+  border-color: #b97b3e;
+  box-shadow: 0 2px 8px rgba(185,123,62,0.12);
+}
 /* SharedStyles.css - Common styles for SpaFlow Web Application */
 
 :root {

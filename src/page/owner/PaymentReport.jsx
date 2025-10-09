@@ -15,7 +15,7 @@ const PaymentReport = () => {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    // Set default date range to current month
+  // กำหนดช่วงวันที่เริ่มต้นเป็นเดือนปัจจุบัน
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -33,7 +33,7 @@ const PaymentReport = () => {
       const endTimestamp = new Date(end);
       endTimestamp.setHours(23, 59, 59, 999); // Set to end of day
 
-      // ดึงข้อมูลการชำระเงินจาก Payments collection ก่อน
+  // ดึงข้อมูลการชำระเงินจาก collection Payments ก่อน
       const paymentsMap = {};
       try {
         const paymentsCol = collection(db, 'Payments');
@@ -89,7 +89,7 @@ const PaymentReport = () => {
         console.error("Error fetching payment details:", error);
       }
 
-      // Try with 'bookings' collection first
+  // ลองดึงข้อมูลจาก collection 'bookings' ก่อน
       let bookingsQuery = query(
         collection(db, 'bookings'),
         where('bookingDate', '>=', startTimestamp),
@@ -98,7 +98,7 @@ const PaymentReport = () => {
 
       let bookingsSnapshot = await getDocs(bookingsQuery);
       
-      // If no results, try with 'Bookings' collection (capital B)
+  // ถ้าไม่พบข้อมูล ลองดึงจาก collection 'Bookings' (B ใหญ่)
       if (bookingsSnapshot.empty) {
         bookingsQuery = query(
           collection(db, 'Bookings')
@@ -111,7 +111,7 @@ const PaymentReport = () => {
       for (const doc of bookingsSnapshot.docs) {
         const booking = { id: doc.id, ...doc.data() };
         
-        // ตรวจสอบว่าวันที่การจองอยู่ในช่วงที่กำหนดหรือไม่
+  // ตรวจสอบว่าวันที่การจองอยู่ในช่วงที่กำหนดหรือไม่
         let bookingDate;
         const dateField = booking.bookingDate || booking.date || booking.serviceDate || booking.appointmentDate;
         
@@ -130,17 +130,17 @@ const PaymentReport = () => {
           }
         }
         
-        // ข้ามถ้าวันที่ไม่อยู่ในช่วงที่กำหนด
+  // ข้ามถ้าวันที่ไม่อยู่ในช่วงที่กำหนด
         if (bookingDate && (bookingDate < startTimestamp || bookingDate > endTimestamp)) {
           continue;
         }
         
-        // นำข้อมูลการชำระเงินมารวมกับข้อมูลการจอง
+  // นำข้อมูลการชำระเงินมารวมกับข้อมูลการจอง
         const paymentInfo = paymentsMap[booking.id];
         if (paymentInfo) {
           booking.paymentDetails = paymentInfo;
           
-          // อัปเดตข้อมูลชำระเงินถ้ามีข้อมูลจาก Payments collection
+          // อัปเดตข้อมูลชำระเงินถ้ามีข้อมูลจาก collection Payments
           booking.paymentStatus = paymentInfo.paymentStatus || booking.paymentStatus;
           booking.paymentMethod = paymentInfo.paymentMethod || booking.paymentMethod;
           booking.totalAmount = paymentInfo.amount || paymentInfo.totalAmount || booking.totalAmount || booking.price;
@@ -171,7 +171,7 @@ const PaymentReport = () => {
           }
         }
         
-        // Fetch customer details if needed
+  // ดึงข้อมูลลูกค้า ถ้าจำเป็น
         if (booking.customerId || booking.userId) {
           try {
             const customerQuery = query(
@@ -187,7 +187,7 @@ const PaymentReport = () => {
           }
         }
 
-        // Fetch service details if needed
+  // ดึงข้อมูลบริการ ถ้าจำเป็น
         if (booking.serviceId && (!booking.service || booking.service === '' || booking.service === 'ไม่ระบุ')) {
           try {
             const serviceQuery = query(
@@ -205,7 +205,7 @@ const PaymentReport = () => {
           }
         }
 
-        // Fetch employee details if needed
+  // ดึงข้อมูลพนักงาน ถ้าจำเป็น
         if (booking.employeeId && (!booking.employeeName || booking.employeeName === '' || booking.employeeName === 'ไม่ระบุ')) {
           try {
             const employeeQuery = query(
@@ -224,7 +224,7 @@ const PaymentReport = () => {
           }
         }
 
-        // Ensure payment information is properly formatted
+  // ตรวจสอบให้แน่ใจว่าข้อมูลการชำระเงินถูกจัดรูปแบบถูกต้อง
         booking.payment = booking.payment || {
           method: booking.paymentStatus === 'ชำระเงินแล้ว' ? 'completed' : 'pending',
           totalAmount: booking.totalAmount || booking.price || 0,
@@ -233,7 +233,7 @@ const PaymentReport = () => {
           creditCard: booking.paymentMethod === 'credit' ? (booking.totalAmount || booking.price || 0) : 0
         };
 
-        // Apply additional filters if set
+  // ใช้ตัวกรองเพิ่มเติมถ้ามีการตั้งค่า
         if (filterCustomer && 
             !(booking.customerDetails?.displayName?.toLowerCase().includes(filterCustomer.toLowerCase()) ||
               booking.userEmail?.toLowerCase().includes(filterCustomer.toLowerCase()) ||
@@ -293,7 +293,7 @@ const PaymentReport = () => {
     fetchBookings(today, today);
   };
 
-  // Calculate summary totals
+  // คำนวณยอดรวมสรุป
   const calculateSummary = () => {
     let summary = {
       totalBookings: bookings.length,
@@ -306,10 +306,10 @@ const PaymentReport = () => {
     };
 
     bookings.forEach(booking => {
-      // ตรวจสอบข้อมูลราคาจากหลายแหล่ง
+  // ตรวจสอบข้อมูลราคาจากหลายแหล่ง
       let amount = 0;
       
-      // ลำดับการดึงราคา: paymentDetails > booking.totalAmount > booking.price
+  // ลำดับการดึงราคา: paymentDetails > booking.totalAmount > booking.price
       if (booking.paymentDetails && (booking.paymentDetails.amount || booking.paymentDetails.totalAmount)) {
         amount = Number(booking.paymentDetails.amount || booking.paymentDetails.totalAmount || 0);
       } else {
@@ -318,10 +318,10 @@ const PaymentReport = () => {
       
       summary.totalAmount += amount;
       
-      // ตรวจสอบวิธีการชำระเงิน - ให้ความสำคัญกับข้อมูลจาก Payments collection
+  // ตรวจสอบวิธีการชำระเงิน - ให้ความสำคัญกับข้อมูลจาก collection Payments
       const rawPaymentMethod = booking.paymentDetails?.paymentMethod || booking.paymentMethod || '';
       
-      // Normalize payment method เหมือนใน DashboardOwner
+  // แปลง payment method ให้อยู่ในรูปแบบเดียวกับ DashboardOwner
       let normalizedPaymentMethod = 'cash'; // default fallback
       if (rawPaymentMethod) {
         const methodLower = rawPaymentMethod.toString().toLowerCase();
@@ -340,7 +340,7 @@ const PaymentReport = () => {
         }
       }
       
-      // Debug: แสดงการแม็ป payment method (สำหรับ 5 รายการแรก)
+  // Debug: แสดงการแม็ป payment method (สำหรับ 5 รายการแรก)
       if (bookings.indexOf(booking) < 5) {
         console.log('PaymentReport summary mapping booking', booking.id, ':', JSON.stringify({
           bookingId: booking.id,
@@ -361,7 +361,7 @@ const PaymentReport = () => {
         summary.totalCreditCard += amount;
       }
       
-      // ตรวจสอบสถานะการชำระเงิน
+  // ตรวจสอบสถานะการชำระเงิน
       const isPaid = booking.paymentStatus === 'ชำระเงินแล้ว' || 
                      booking.paymentDetails?.paymentStatus === 'ชำระเงินแล้ว' || 
                      booking.payment?.method === 'completed';
@@ -378,21 +378,21 @@ const PaymentReport = () => {
 
   const summary = calculateSummary();
 
-  // Format date for display
+  // ฟังก์ชันแปลงวันที่สำหรับแสดงผล
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('th-TH');
   };
 
-  // Format time for display
+  // ฟังก์ชันแปลงเวลาเพื่อแสดงผล
   const formatTime = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Calculate duration
+  // ฟังก์ชันคำนวณระยะเวลา
   const calculateDuration = (startTime, endTime) => {
     if (!startTime || !endTime) return 'N/A';
     const start = new Date(startTime);
@@ -403,19 +403,19 @@ const PaymentReport = () => {
     return `${hours} ชั่วโมง ${minutes} นาที`;
   };
 
-  // Format currency
+  // ฟังก์ชันแปลงจำนวนเงินเป็นรูปแบบสกุลเงิน
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(Number(amount) || 0);
   };
 
-  // Export payment report to Excel
+  // ฟังก์ชันส่งออกรายงานการชำระเงินเป็น Excel
   const exportPaymentReportToExcel = () => {
     try {
       setExporting(true);
       
-      // ข้อมูลสำหรับรายงานการชำระเงิน
+  // เตรียมข้อมูลสำหรับรายงานการชำระเงิน
       const paymentReportData = bookings.map(booking => {
-        // Determine date object
+  // ตรวจสอบและแปลงวันที่
         let bookingDate;
         if (booking.bookingDate && typeof booking.bookingDate.toDate === 'function') {
           bookingDate = booking.bookingDate.toDate();
@@ -427,7 +427,7 @@ const PaymentReport = () => {
           bookingDate = new Date();
         }
 
-        // Determine times
+  // ตรวจสอบและแปลงเวลาเริ่มต้น
         let startTime;
         if (booking.startTime && typeof booking.startTime.toDate === 'function') {
           startTime = booking.startTime.toDate();
@@ -443,7 +443,7 @@ const PaymentReport = () => {
           startTime = booking.serviceTime;
         }
 
-        // ข้อมูลเพิ่มเติมสำหรับการแสดงผล
+  // ข้อมูลเพิ่มเติมสำหรับการแสดงผล
         let paymentSource = booking.paymentDetails ? 'Payments' : 'Bookings';
         let paymentDate = null;
         
@@ -453,17 +453,17 @@ const PaymentReport = () => {
           paymentDate = booking.paidAt;
         }
 
-        // การตรวจสอบสถานะการชำระเงิน
+  // ตรวจสอบสถานะการชำระเงิน
         const isPaid = booking.paymentStatus === 'ชำระเงินแล้ว' || 
                        booking.paymentDetails?.paymentStatus === 'ชำระเงินแล้ว' || 
                        booking.payment?.method === 'completed';
         const paymentStatusText = isPaid ? 'ชำระเงินแล้ว' : 'รอชำระเงิน';
 
-        // ตรวจสอบวิธีการชำระเงิน
+  // ตรวจสอบวิธีการชำระเงิน
         const rawPaymentMethod = booking.paymentDetails?.paymentMethod || booking.paymentMethod || '';
         let paymentMethodText = 'ไม่ระบุ';
         
-        // แปลงวิธีการชำระเงินให้เป็นข้อความภาษาไทย
+  // แปลงวิธีการชำระเงินให้เป็นข้อความภาษาไทย
         if (rawPaymentMethod) {
           const methodLower = rawPaymentMethod.toString().toLowerCase();
           if (methodLower.includes('credit') || methodLower.includes('card') || methodLower === 'credit') {
@@ -477,7 +477,7 @@ const PaymentReport = () => {
           }
         }
 
-        // ตรวจสอบข้อมูลลูกค้า
+  // ตรวจสอบข้อมูลลูกค้า
         const customerName = booking.customerDetails?.fullName
           || booking.customerDetails?.displayName
           || booking.customerDetails?.name
@@ -492,19 +492,19 @@ const PaymentReport = () => {
         const customerEmail = booking.customerDetails?.email || booking.userEmail || booking.customerEmail || '-';
         const customerPhone = booking.customerDetails?.phone || booking.customerDetails?.phoneNumber || booking.phone || '-';
         
-        // ตรวจสอบข้อมูลบริการ
+  // ตรวจสอบข้อมูลบริการ
         const serviceName = booking.service || booking.serviceName || 'บริการทั่วไป';
         
-        // ตรวจสอบราคา
+  // ตรวจสอบราคา
         const bookingAmount = booking.paymentDetails?.amount || 
                              booking.paymentDetails?.totalAmount || 
                              booking.totalAmount || 
                              booking.price || 0;
                              
-        // ข้อมูลใบเสร็จ
+  // ข้อมูลใบเสร็จ
         const receiptInfo = booking.paymentDetails?.transactionId || booking.transactionId || '-';
 
-        // ข้อมูลวันที่ชำระเงิน
+  // ข้อมูลวันที่ชำระเงิน
         let formattedPaymentDate = '-';
         if (paymentDate) {
           try {
@@ -540,7 +540,7 @@ const PaymentReport = () => {
         };
       });
 
-      // สร้างข้อมูลสรุป
+  // สร้างข้อมูลสรุป
       const summary = calculateSummary();
       const summaryData = [
         { 'สรุปข้อมูล': 'รายงานการชำระเงิน', 'จำนวน': '', 'มูลค่า': '' },
@@ -556,13 +556,13 @@ const PaymentReport = () => {
         { 'สรุปข้อมูล': 'บัตรเครดิต', 'จำนวน': '', 'มูลค่า': summary.totalCreditCard },
       ];
 
-      // สร้าง Workbook
+  // สร้าง Workbook
       const wb = XLSX.utils.book_new();
       
-      // สร้าง Worksheet สำหรับข้อมูลการชำระเงิน
+  // สร้าง Worksheet สำหรับข้อมูลการชำระเงิน
       const ws = XLSX.utils.json_to_sheet(paymentReportData);
       
-      // กำหนดความกว้างของคอลัมน์
+  // กำหนดความกว้างของคอลัมน์
       const wscols = [
         { wch: 15 }, // วันที่ใช้บริการ
         { wch: 10 }, // เวลา
@@ -580,13 +580,13 @@ const PaymentReport = () => {
       ];
       ws['!cols'] = wscols;
       
-      // เพิ่ม Worksheet ลงใน Workbook
+  // เพิ่ม Worksheet ลงใน Workbook
       XLSX.utils.book_append_sheet(wb, ws, "รายงานการชำระเงิน");
       
-      // สร้าง Worksheet สำหรับข้อมูลสรุป
+  // สร้าง Worksheet สำหรับข้อมูลสรุป
       const wsSummary = XLSX.utils.json_to_sheet(summaryData);
       
-      // กำหนดความกว้างของคอลัมน์สำหรับหน้าสรุป
+  // กำหนดความกว้างของคอลัมน์สำหรับหน้าสรุป
       const wsSummaryCols = [
         { wch: 30 }, // สรุปข้อมูล
         { wch: 15 }, // จำนวน
@@ -594,13 +594,13 @@ const PaymentReport = () => {
       ];
       wsSummary['!cols'] = wsSummaryCols;
       
-      // เพิ่ม Worksheet สรุปลงใน Workbook
+  // เพิ่ม Worksheet สรุปลงใน Workbook
       XLSX.utils.book_append_sheet(wb, wsSummary, "สรุปข้อมูล");
       
-      // กำหนดชื่อไฟล์
+  // กำหนดชื่อไฟล์
       const fileName = `รายงานการชำระเงิน_${startDate}_ถึง_${endDate}.xlsx`;
       
-      // สร้าง Excel file และดาวน์โหลด
+  // สร้างไฟล์ Excel และดาวน์โหลด
       XLSX.writeFile(wb, fileName);
       
       console.log(`Successfully exported payment report to ${fileName}`);
@@ -688,7 +688,7 @@ const PaymentReport = () => {
             </div>
           </div>
 
-          {/* เพิ่มส่วนกรองข้อมูลละเอียด */}
+          {/* ส่วนกรองข้อมูลละเอียด */}
           <div className="row mb-4">
             <div className="col-md-3 mb-3">
               <label className="form-label">ค้นหาลูกค้า</label>
@@ -1085,7 +1085,7 @@ const PaymentReport = () => {
             </div>
           )}
 
-          {/* สรุปข้อมูลด้านล่าง */}
+          {/* ส่วนสรุปข้อมูลด้านล่าง */}
           <div className="row mt-4">
             <div className="col-12 mb-3">
               <h5 className="mb-3 border-bottom pb-2"><i className="fas fa-chart-pie me-2 text-primary"></i>สรุปการชำระเงิน</h5>
@@ -1241,7 +1241,7 @@ const PaymentReport = () => {
             </div>
           </div>
           
-          {/* ยอดรวมทั้งหมด */}
+          {/* ส่วนยอดรวมทั้งหมด */}
           <div className="card border-0 shadow-sm bg-gradient text-white mt-3" style={{ background: 'linear-gradient(135deg, #7B4019 0%, #964B1F 100%)' }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-center justify-content-between">
@@ -1259,7 +1259,7 @@ const PaymentReport = () => {
             </div>
           </div>
           
-          {/* คำอธิบายการดาวน์โหลดรายงาน */}
+          {/* ส่วนคำอธิบายการดาวน์โหลดรายงาน */}
           {bookings.length > 0 && (
             <div className="alert alert-info mt-3">
               <div className="d-flex">

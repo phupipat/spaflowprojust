@@ -26,11 +26,11 @@ function DashboardOwner() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
-  // State สำหรับ dropdown เลือกพนักงาน
+  // สเตตสำหรับ dropdown เลือกพนักงาน
   const [employees, setEmployees] = useState([]);
   const [assigningEmployee, setAssigningEmployee] = useState({}); // { [bookingId]: boolean }
 
-  // ดึงรายชื่อพนักงาน (role == 'employee' หรือ 'staff')
+  // ดึงรายชื่อพนักงาน (role เป็น 'employee' หรือ 'staff')
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
@@ -49,7 +49,7 @@ function DashboardOwner() {
     fetchEmployees();
   }, []);
 
-  // ฟังก์ชันกำหนดพนักงานให้ booking
+  // ฟังก์ชันสำหรับกำหนดพนักงานให้กับ booking
   const assignEmployeeToBooking = async (bookingId, employeeId) => {
     setAssigningEmployee(prev => ({ ...prev, [bookingId]: true }));
     try {
@@ -68,7 +68,7 @@ function DashboardOwner() {
     }
     setAssigningEmployee(prev => ({ ...prev, [bookingId]: false }));
   };
-  // สถิติเชิงธุรกิจ
+  // สเตตสำหรับสถิติเชิงธุรกิจ
   const [stats, setStats] = useState({
     todayRevenue: 0,
     monthRevenue: 0,
@@ -89,7 +89,7 @@ function DashboardOwner() {
     }
   });
 
-  // Export report to Excel (XLSX)
+  // ฟังก์ชันสำหรับส่งออกรายงานเป็น Excel (XLSX)
   const exportReportToExcel = () => {
     try {
       // Build rows from bookings
@@ -164,7 +164,7 @@ function DashboardOwner() {
     }
   };
   
-  // Export payment report to Excel (XLSX)
+  // ฟังก์ชันสำหรับส่งออกรายงานการชำระเงินเป็น Excel (XLSX)
   const exportPaymentReportToExcel = () => {
     try {
       // สร้างข้อมูลเฉพาะรายการชำระเงิน
@@ -270,12 +270,12 @@ function DashboardOwner() {
       alert('เกิดข้อผิดพลาดขณะดาวน์โหลดรายงานการชำระเงิน กรุณาลองใหม่');
     }
   };
-  // เพิ่ม state สำหรับปฏิทิน
+  // สเตตสำหรับปฏิทิน
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' หรือ 'bookings'
   
-  // หมวดหมู่เมนู
+  // หมวดหมู่ของเมนู
   const menuCategories = [
     {
       title: "จัดการร้าน",
@@ -600,7 +600,7 @@ function DashboardOwner() {
     // Set up interval to refresh pending count every 5 minutes
     const pendingTimer = setInterval(fetchPendingCount, 5 * 60 * 1000);
   // Set up interval to refresh bookings every 2 minutes (ใช้ refreshBookings เพื่อให้เหมือนปุ่มรีเฟรช)
-  const bookingsTimer = setInterval(refreshBookings, 2 * 60 * 1000);
+  const bookingsTimer = setInterval(() => refreshBookings(false), 2 * 60 * 1000);
 
     return () => {
       clearInterval(timer);
@@ -610,7 +610,7 @@ function DashboardOwner() {
     };
   }, []);
 
-  // เพิ่ม useEffect สำหรับ debug ข้อมูล
+  // useEffect สำหรับ debug ข้อมูล
   useEffect(() => {
     console.log('=== DEBUG INFO ===');
     console.log('Total bookings:', bookings.length);
@@ -624,7 +624,7 @@ function DashboardOwner() {
     console.log('==================');
   }, [bookings, currentMonth, selectedDate, viewMode]);
 
-  // คำนวณสถิติเชิงธุรกิจเมื่อ bookings เปลี่ยน
+  // useEffect สำหรับคำนวณสถิติเชิงธุรกิจเมื่อ bookings เปลี่ยน
   useEffect(() => {
     const fetchPaymentsAndUpdateStats = async () => {
       if (!bookings || bookings.length === 0) {
@@ -941,14 +941,14 @@ function DashboardOwner() {
     fetchPaymentsAndUpdateStats();
   }, [bookings, chartSettings.dateRange]);
 
-  // Handle clicking outside of sidebar on mobile to close it
+  // ฟังก์ชันปิด sidebar เมื่อคลิกนอก sidebar (บนมือถือ)
   const handleOverlayClick = () => {
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
   };
   
-  // Function to refresh pending approvals count
+  // ฟังก์ชันรีเฟรชนับจำนวนรายการรออนุมัติ
   const refreshPendingCount = async () => {
     try {
       const usersRef = collection(db, 'artifacts/login-spa-7921d/users');
@@ -963,7 +963,7 @@ function DashboardOwner() {
     }
   };
   
-  // ฟังก์ชันสำหรับออกจากระบบ
+  // ฟังก์ชันออกจากระบบ
   const handleLogout = async () => {
     if (!window.confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) return;
     try {
@@ -977,17 +977,17 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันสำหรับไปยังหน้าโปรไฟล์
+  // ฟังก์ชันไปยังหน้าโปรไฟล์
   const goToProfile = () => {
     navigate('/owner/profile');
   };
 
-  // ฟังก์ชันสำหรับไปยังหน้าตั้งค่าระบบ
+  // ฟังก์ชันไปยังหน้าตั้งค่าระบบ
   const goToSettings = () => {
     navigate('/owner/settings');
   };
 
-  // ฟังก์ชันอนุมัติการจอง
+  // ฟังก์ชันสำหรับอนุมัติการจอง
   const approveBooking = async (bookingId) => {
     try {
       const bookingRef = doc(db, 'Bookings', bookingId);
@@ -1010,7 +1010,7 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันปฏิเสธการจอง
+  // ฟังก์ชันสำหรับปฏิเสธการจอง
   const rejectBooking = async (bookingId) => {
     if (!window.confirm('ต้องการปฏิเสธการจองนี้ใช่หรือไม่?')) return;
     
@@ -1035,7 +1035,7 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันลบการจอง
+  // ฟังก์ชันสำหรับลบการจอง
   const deleteBooking = async (bookingId) => {
     if (!window.confirm('ต้องการลบการจองนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้')) return;
     
@@ -1053,7 +1053,7 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันตรวจสอบคอลเลคชั่น Bookings ทั้งหมด
+  // ฟังก์ชันสำหรับตรวจสอบคอลเลคชั่น Bookings ทั้งหมด
   const debugListAllCollections = async () => {
     try {
       console.log('Attempting to list all collections...');
@@ -1114,7 +1114,7 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันสำหรับค้นหาการจองด้วย ID โดยตรง (สำหรับตรวจสอบ)
+  // ฟังก์ชันสำหรับค้นหาการจองด้วย ID โดยตรง (สำหรับ debug)
   const checkBookingById = async (bookingId) => {
     try {
       console.log(`Checking for booking with ID: ${bookingId}`);
@@ -1244,7 +1244,7 @@ function DashboardOwner() {
   }
 };
 
-  // ฟังก์ชันดูรายละเอียดการจอง
+  // ฟังก์ชันสำหรับดูรายละเอียดการจอง
   const viewBookingDetails = async (booking) => {
     try {
   // ดึงข้อมูลการชำระเงินจากคอลเลคชัน `Payments` โดยใช้ `booking.id`
@@ -1390,7 +1390,7 @@ function DashboardOwner() {
       setShowBookingDetails(true);
     }
   };
-  const refreshBookings = async () => {
+  const refreshBookings = async (showAlert = true) => {
       setLoadingBookings(true);
     try {
       console.log('Refreshing bookings...');
@@ -1703,17 +1703,21 @@ function DashboardOwner() {
       
       setBookings(sortedBookings);
 
-      alert(`โหลดข้อมูลการจอง ${sortedBookings.length} รายการเรียบร้อยแล้ว`);
+      if (showAlert) {
+        alert(`โหลดข้อมูลการจอง ${sortedBookings.length} รายการเรียบร้อยแล้ว`);
+      }
     } catch (error) {
       console.error('Error refreshing bookings:', error);
-      alert('เกิดข้อผิดพลาดในการรีเฟรชข้อมูลการจอง กรุณาลองใหม่อีกครั้ง');
+      if (showAlert) {
+        alert('เกิดข้อผิดพลาดในการรีเฟรชข้อมูลการจอง กรุณาลองใหม่อีกครั้ง');
+      }
       setBookings([]);
     } finally {
       setLoadingBookings(false);
     }
   };
 
-  // ฟังก์ชันสำหรับการจัดการปฏิทิน
+  // ฟังก์ชันสำหรับเปลี่ยนเดือนในปฏิทิน
   const nextMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
   };
@@ -1758,7 +1762,7 @@ function DashboardOwner() {
     setViewMode('bookings'); // เปลี่ยนไปแสดงรายการจอง
   };
 
-  // ฟังก์ชันสร้างปฏิทิน
+  // ฟังก์ชันสำหรับสร้างปฏิทิน
   const generateCalendar = () => {
     const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
     const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
@@ -1895,7 +1899,7 @@ function DashboardOwner() {
     return calendar;
   };
 
-  // ฟังก์ชันดึงวันที่จองจาก booking (รองรับทุกรูปแบบการจัดเก็บวันที่)
+  // ฟังก์ชันสำหรับดึงวันที่จองจาก booking (รองรับทุกรูปแบบการจัดเก็บวันที่)
   function getBookingDate(booking) {
     // ตรวจสอบจากทุกฟิลด์ที่อาจเก็บข้อมูลวันที่
     const possibleDateFields = ['bookingDate', 'date', 'serviceDate', 'appointmentDate'];
@@ -1918,7 +1922,7 @@ function DashboardOwner() {
     return null;
   }
 
-  // ฟังก์ชันกรองการจองตามวันที่ที่เลือก
+  // ฟังก์ชันสำหรับกรองการจองตามวันที่ที่เลือก
   // คืนค่า array ของ bookings ที่ตรงกับวันที่ selectedDate
   const bookingsForSelectedDate = bookings.filter(b => {
     if (!selectedDate) return false;
@@ -2331,7 +2335,7 @@ function DashboardOwner() {
                         </button>
                       )}
                       <button className="btn btn-sm" 
-                        onClick={refreshBookings}
+                        onClick={() => refreshBookings(true)}
                         style={{
                           background: 'linear-gradient(135deg, #ff9900 0%, #ff7730 100%)',
                           color: 'white',
@@ -3821,7 +3825,8 @@ function DashboardOwner() {
                       {(selectedBooking.status === 'ยืนยันแล้ว' || selectedBooking.status === 'รอชำระเงิน') && 
                         selectedBooking.paymentStatus === 'รอชำระเงิน' && (
                         <button 
-                          className="btn btn-primary me-2" 
+                          className="btn btn-success me-2" 
+                          style={{ background: '#a74428ff', borderColor: '#28a745', color: '#fff', fontWeight: 'bold' }}
                           onClick={() => {
                             confirmPayment(selectedBooking.id);
                             setShowBookingDetails(false);
