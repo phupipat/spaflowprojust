@@ -8,6 +8,26 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import '../../styles/SharedStyles.css';
 import '../../styles/DashboardStyles.css';
 
+// Custom CSS for week navigation buttons
+const weekNavButtonStyle = `
+  @keyframes buttonPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.97); }
+    100% { transform: scale(1); }
+  }
+  
+  @keyframes buttonRipple {
+    0% {
+      transform: scale(0);
+      opacity: 0.5;
+    }
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+`;
+
 function DashboardEmployee() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -1959,28 +1979,92 @@ function DashboardEmployee() {
                   {/* Navigation Buttons */}
                   <div className="btn-group">
                     <button 
-                      className="btn btn-sm"
-                      onClick={() => changeWeek(-1)}
+                      className="btn btn-sm week-nav-btn"
+                      onClick={(e) => {
+                        // Create ripple element
+                        const ripple = document.createElement('span');
+                        ripple.classList.add('btn-ripple');
+                        ripple.style.position = 'absolute';
+                        ripple.style.top = e.nativeEvent.offsetY + 'px';
+                        ripple.style.left = e.nativeEvent.offsetX + 'px';
+                        ripple.style.width = '5px';
+                        ripple.style.height = '5px';
+                        ripple.style.background = 'rgba(255, 255, 255, 0.5)';
+                        ripple.style.borderRadius = '50%';
+                        ripple.style.transform = 'translate(-50%, -50%)';
+                        ripple.style.animation = 'buttonRipple 0.6s ease';
+                        e.currentTarget.appendChild(ripple);
+                        
+                        // Remove ripple after animation
+                        setTimeout(() => {
+                          ripple.remove();
+                        }, 600);
+                        
+                        changeWeek(-1);
+                      }}
                       style={{
                         backgroundColor: 'transparent',
                         color: '#ff7730',
-                        border: '1px solid #ff7730'
+                        border: '1px solid #ff7730',
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 119, 48, 0.1)';
+                        e.currentTarget.querySelector('i').style.transform = 'translateX(-3px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.querySelector('i').style.transform = 'translateX(0)';
                       }}
                     >
-                      <i className="fas fa-chevron-left me-1"></i>
+                      <i className="fas fa-chevron-left me-1" style={{ transition: 'transform 0.3s ease' }}></i>
                       สัปดาห์ก่อน
                     </button>
                     <button 
-                      className="btn btn-sm"
-                      onClick={() => changeWeek(1)}
+                      className="btn btn-sm week-nav-btn"
+                      onClick={(e) => {
+                        // Create ripple element
+                        const ripple = document.createElement('span');
+                        ripple.classList.add('btn-ripple');
+                        ripple.style.position = 'absolute';
+                        ripple.style.top = e.nativeEvent.offsetY + 'px';
+                        ripple.style.left = e.nativeEvent.offsetX + 'px';
+                        ripple.style.width = '5px';
+                        ripple.style.height = '5px';
+                        ripple.style.background = 'rgba(255, 255, 255, 0.5)';
+                        ripple.style.borderRadius = '50%';
+                        ripple.style.transform = 'translate(-50%, -50%)';
+                        ripple.style.animation = 'buttonRipple 0.6s ease';
+                        e.currentTarget.appendChild(ripple);
+                        
+                        // Remove ripple after animation
+                        setTimeout(() => {
+                          ripple.remove();
+                        }, 600);
+                        
+                        changeWeek(1);
+                      }}
                       style={{
                         backgroundColor: 'transparent',
                         color: '#ff7730',
-                        border: '1px solid #ff7730'
+                        border: '1px solid #ff7730',
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 119, 48, 0.1)';
+                        e.currentTarget.querySelector('i').style.transform = 'translateX(3px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.querySelector('i').style.transform = 'translateX(0)';
                       }}
                     >
                       สัปดาห์หน้า
-                      <i className="fas fa-chevron-right ms-1"></i>
+                      <i className="fas fa-chevron-right ms-1" style={{ transition: 'transform 0.3s ease' }}></i>
                     </button>
                   </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../../Firebase';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import '../../styles/SharedStyles.css';
@@ -542,22 +542,109 @@ function StaffSchedule() {
             <div className="col-md-3 text-center">
               <div className="btn-group">
                 <button 
-                  className="btn btn-outline-secondary" 
-                  onClick={showMonthView ? goToPreviousMonth : goToPreviousWeek}
+                  className="btn btn-outline-secondary week-nav-btn" 
+                  onClick={(e) => {
+                    // Create ripple element
+                    const ripple = document.createElement('span');
+                    ripple.classList.add('btn-ripple');
+                    ripple.style.position = 'absolute';
+                    ripple.style.top = e.nativeEvent.offsetY + 'px';
+                    ripple.style.left = e.nativeEvent.offsetX + 'px';
+                    ripple.style.width = '5px';
+                    ripple.style.height = '5px';
+                    ripple.style.background = 'rgba(255, 255, 255, 0.5)';
+                    ripple.style.borderRadius = '50%';
+                    ripple.style.transform = 'translate(-50%, -50%)';
+                    ripple.style.animation = 'buttonRipple 0.6s ease';
+                    e.currentTarget.appendChild(ripple);
+                    
+                    // Remove ripple after animation
+                    setTimeout(() => {
+                      ripple.remove();
+                    }, 600);
+                    
+                    showMonthView ? goToPreviousMonth() : goToPreviousWeek();
+                  }}
                   title={showMonthView ? "เดือนก่อนหน้า" : "สัปดาห์ก่อนหน้า"}
+                  style={{
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.querySelector('i').style.transform = 'translateX(-3px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.querySelector('i').style.transform = 'translateX(0)';
+                  }}
                 >
-                  <i className="fas fa-chevron-left"></i>
+                  <i className="fas fa-chevron-left" style={{ transition: 'transform 0.3s ease' }}></i>
                 </button>
                 <button 
-                  className="btn btn-outline-brown" 
-                  onClick={goToToday}
+                  className="btn btn-outline-brown week-nav-btn" 
+                  onClick={(e) => {
+                    // Create ripple element
+                    const ripple = document.createElement('span');
+                    ripple.classList.add('btn-ripple');
+                    ripple.style.position = 'absolute';
+                    ripple.style.top = e.nativeEvent.offsetY + 'px';
+                    ripple.style.left = e.nativeEvent.offsetX + 'px';
+                    ripple.style.width = '5px';
+                    ripple.style.height = '5px';
+                    ripple.style.background = 'rgba(255, 255, 255, 0.5)';
+                    ripple.style.borderRadius = '50%';
+                    ripple.style.transform = 'translate(-50%, -50%)';
+                    ripple.style.animation = 'buttonRipple 0.6s ease';
+                    e.currentTarget.appendChild(ripple);
+                    
+                    // Remove ripple after animation
+                    setTimeout(() => {
+                      ripple.remove();
+                    }, 600);
+                    
+                    goToToday();
+                  }}
+                  style={{
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
                 >
                   วันนี้
                 </button>
                 <button 
-                  className="btn btn-outline-secondary" 
-                  onClick={showMonthView ? goToNextMonth : goToNextWeek}
+                  className="btn btn-outline-secondary week-nav-btn" 
+                  onClick={(e) => {
+                    // Create ripple element
+                    const ripple = document.createElement('span');
+                    ripple.classList.add('btn-ripple');
+                    ripple.style.position = 'absolute';
+                    ripple.style.top = e.nativeEvent.offsetY + 'px';
+                    ripple.style.left = e.nativeEvent.offsetX + 'px';
+                    ripple.style.width = '5px';
+                    ripple.style.height = '5px';
+                    ripple.style.background = 'rgba(255, 255, 255, 0.5)';
+                    ripple.style.borderRadius = '50%';
+                    ripple.style.transform = 'translate(-50%, -50%)';
+                    ripple.style.animation = 'buttonRipple 0.6s ease';
+                    e.currentTarget.appendChild(ripple);
+                    
+                    // Remove ripple after animation
+                    setTimeout(() => {
+                      ripple.remove();
+                    }, 600);
+                    
+                    showMonthView ? goToNextMonth() : goToNextWeek();
+                  }}
                   title={showMonthView ? "เดือนถัดไป" : "สัปดาห์ถัดไป"}
+                  style={{
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.querySelector('i').style.transform = 'translateX(3px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.querySelector('i').style.transform = 'translateX(0)';
+                  }}
                 >
                   <i className="fas fa-chevron-right"></i>
                 </button>

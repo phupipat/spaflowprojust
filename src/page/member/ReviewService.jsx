@@ -638,7 +638,7 @@ function ReviewService() {
   return (
     <div className="page-container">
       <div className="card shadow-sm">
-        <div className="card-header bg-primary text-white py-3">
+        <div className="card-header text-white py-3" style={{background: '#7B4019'}}>
           <div className="d-flex align-items-center">
             <button 
               type="button"
@@ -661,7 +661,7 @@ function ReviewService() {
                 <i className="fas fa-check-circle text-success" style={{ fontSize: '3rem' }}></i>
               </div>
               <h3 className="mb-3">ขอบคุณสำหรับรีวิวของคุณ</h3>
-              <div className="alert alert-success my-3">
+              <div className="alert my-3" style={{background: 'rgba(123, 64, 25, 0.1)', color: '#7B4019', border: '1px solid #7B4019'}}>
                 <p className="mb-1"><i className="fas fa-star me-2"></i> <strong>คะแนนที่ให้:</strong> {rating} ดาว</p>
                 {comment && <p className="mb-1"><i className="fas fa-comment me-2"></i> <strong>ความคิดเห็น:</strong> "{comment}"</p>}
                 <p className="mb-1"><i className="fas fa-check me-2"></i> <strong>สถานะ:</strong> บันทึกลงฐานข้อมูลเรียบร้อยแล้ว</p>
@@ -670,7 +670,7 @@ function ReviewService() {
               <div className="mt-4">
                 <button
                   type="button"
-                  className="primary-btn action-btn px-5 py-3"
+                  className="btn btn-brown px-5 py-3"
                   style={{ fontSize: '1.2rem', fontWeight: 'bold' }}
                   onClick={() => {
                     console.log('SUCCESS_SCREEN home button clicked');
@@ -792,7 +792,7 @@ function ReviewService() {
 
                   <button
                     type="button"
-                    className="primary-btn action-btn px-5 py-3 mb-2"
+                    className="btn btn-brown px-5 py-3 mb-2"
                     style={{fontSize: '1.2rem', fontWeight: 'bold'}}
                     onClick={(e) => {
                       // Log event target and computed styles to detect overlays or CSS blocking
