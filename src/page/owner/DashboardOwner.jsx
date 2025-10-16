@@ -70,9 +70,9 @@ function DashboardOwner() {
   };
   // สเตตสำหรับสถิติเชิงธุรกิจ
   const [stats, setStats] = useState({
-    todayRevenue: 0,
+    todayRevenue: 0, // จะถูกใช้เป็นรายได้ตามช่วงวันที่ที่เลือก
     monthRevenue: 0,
-    paymentChannels: {},
+    paymentChannels: {}, // จะถูกใช้เป็นการชำระเงินตามช่วงวันที่ที่เลือก
     todayBookings: 0,
     todayCustomers: 0
   });
@@ -730,6 +730,12 @@ function DashboardOwner() {
         console.log('Error while resolving services for stats:', e);
       }
 
+      // เพิ่มตัวแปรสำหรับคำนวณรายรับและสถิติต่างๆ ตามวันที่ที่เลือกในตัวเลือกแผนภูมิ
+      let selectedDateRangeRevenue = 0;
+      let selectedDatePaymentChannels = { cash: 0, transfer: 0, credit: 0 };
+      let selectedDateBookings = 0;
+      let selectedDateCustomersSet = new Set();
+      
       bookings.forEach(b => {
         // หาข้อมูลการชำระเงินที่เกี่ยวข้อง
         // พยายามแม็ปโดย booking.id, หรือถ้า booking เก็บ paymentId ให้แม็ปโดย payment doc id ด้วย
@@ -796,6 +802,27 @@ function DashboardOwner() {
             const bookingDateStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${String(bookingDate.getDate()).padStart(2, '0')}`;
             const bookingMonthStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}`;
             
+            // เช็คว่าวันที่นี้อยู่ในช่วง chartSettings.dateRange หรือไม่
+            const isInSelectedDateRange = bookingDateStr >= chartSettings.dateRange.start && bookingDateStr <= chartSettings.dateRange.end;
+            
+            // ถ้าอยู่ในช่วงวันที่ที่เลือก ให้เพิ่มรายได้และช่องทางการชำระเงินในช่วงวันที่ที่เลือก
+            if (isInSelectedDateRange) {
+              selectedDateRangeRevenue += bookingAmount;
+              if (selectedDatePaymentChannels[paymentMethod] !== undefined) {
+                selectedDatePaymentChannels[paymentMethod] += bookingAmount;
+              }
+              
+              // เพิ่มนับจำนวนการจองในวันที่เลือก
+              selectedDateBookings += 1;
+              
+              // เพิ่มลูกค้าในวันที่เลือก (ใช้เซตเพื่อไม่นับซ้ำ)
+              if (b.userEmail) selectedDateCustomersSet.add(b.userEmail);
+              if (b.userId) selectedDateCustomersSet.add(b.userId);
+              if (b.customerEmail) selectedDateCustomersSet.add(b.customerEmail);
+              if (b.customer && b.customer.email) selectedDateCustomersSet.add(b.customer.email);
+              if (b.customer && b.customer.id) selectedDateCustomersSet.add(b.customer.id);
+            }
+            
             if (bookingDateStr === todayStr) {
               todayRevenue += bookingAmount;
               todayBookings += 1;
@@ -809,7 +836,7 @@ function DashboardOwner() {
             }
           }
           
-          // รายรับแยกช่องทาง
+          // รายรับแยกช่องทาง (สะสม - ทั้งหมด)
           if (paymentChannels[paymentMethod] !== undefined) {
             paymentChannels[paymentMethod] += bookingAmount;
           }
@@ -912,16 +939,47 @@ function DashboardOwner() {
         .sort((a, b) => new Date(a.month) - new Date(b.month))
         .slice(-6); // 6 เดือนล่าสุด
 
+      // ใช้รายได้ การจอง ลูกค้า และช่องทางการชำระเงินในช่วงวันที่ที่เลือกแทนค่าเดิม
       setStats({
-        todayRevenue,
+        todayRevenue: selectedDateRangeRevenue, // รายได้ตามวันที่เลือก
         monthRevenue,
-        paymentChannels,
-        todayBookings,
-        todayCustomers: todayCustomersSet.size
+        paymentChannels: selectedDatePaymentChannels, // ช่องทางการชำระเงินตามวันที่เลือก
+        todayBookings: selectedDateBookings, // จำนวนการจองตามวันที่เลือก
+        todayCustomers: selectedDateCustomersSet.size, // จำนวนลูกค้าตามวันที่เลือก (ไม่นับซ้ำ)
+        todayCompletedBookings: bookings.filter(b => {
+          // นับการจองที่สถานะเป็น "เสร็จสิ้น" หรือ "completed"
+          if (!b.status) return false;
+          const status = b.status.toLowerCase();
+          if (status.includes('เสร็จสิ้น') || status.includes('completed') || status.includes('สำเร็จ')) {
+            // ตรวจสอบว่าอยู่ในวันที่เลือกหรือไม่
+            const dateField = getBookingDate(b);
+            if (!dateField) return false;
+            
+            try {
+              let bookingDate;
+              if (typeof dateField === 'string') {
+                bookingDate = new Date(dateField);
+              } else if (dateField.toDate && typeof dateField.toDate === 'function') {
+                bookingDate = dateField.toDate();
+              } else if (dateField instanceof Date) {
+                bookingDate = dateField;
+              }
+              
+              const bookingDateStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${String(bookingDate.getDate()).padStart(2, '0')}`;
+              return bookingDateStr === chartSettings.dateRange.start;
+            } catch (e) {
+              return false;
+            }
+          }
+          return false;
+        }).length
       });
 
       // Debug summary: show final payment channel breakdown
-      console.log('Payment channels summary after processing bookings:', paymentChannels);
+      console.log('Payment channels summary after processing bookings (all):', paymentChannels);
+      console.log('Selected date range payment channels:', selectedDatePaymentChannels);
+      console.log('Selected date range revenue:', selectedDateRangeRevenue);
+      console.log('Date range used:', chartSettings.dateRange);
 
       setChartData({
         dailyBookings,
@@ -2944,17 +3002,17 @@ function DashboardOwner() {
                               color: '#ff7730',
                               fontSize: '24px'
                             }}>
-                              <i className="fas fa-wallet"></i>
+                                <i className="fas fa-wallet"></i>
                             </div>
                             <div className="ms-3">
-                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>รายได้วันนี้</span>
+                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>รายได้วันที่ {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {day: 'numeric', month: 'short'})}</span>
                               <span className="fw-bold" style={{ fontSize: '1.5rem' }}>฿{stats.todayRevenue.toLocaleString()}</span>
                             </div>
                           </div>
                           <div className="d-flex justify-content-between mt-2">
                             <small className="text-muted">
                               <i className="far fa-calendar-alt me-1"></i>
-                              <span>{new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>
+                              <span>ข้อมูล ณ วันที่ {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {day: 'numeric', month: 'short'})}</span>
                             </small>
                           </div>
                         </div>
@@ -2978,14 +3036,13 @@ function DashboardOwner() {
                               <i className="fas fa-calendar-alt"></i>
                             </div>
                             <div className="ms-3">
-                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>รายได้เดือนนี้</span>
+                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>รายได้เดือน {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {month: 'long'})}</span>
                               <span className="fw-bold" style={{ fontSize: '1.5rem' }}>฿{stats.monthRevenue.toLocaleString()}</span>
                             </div>
                           </div>
                           <div className="d-flex justify-content-between mt-2">
                             <small className="text-muted">
-                              <i className="far fa-calendar me-1"></i>
-                              <span>{new Date().toLocaleDateString('th-TH', { month: 'long' })}</span>
+                              <span>&nbsp;</span>
                             </small>
                           </div>
                         </div>
@@ -3009,7 +3066,7 @@ function DashboardOwner() {
                               <i className="fas fa-users"></i>
                             </div>
                             <div className="ms-3">
-                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>ลูกค้าวันนี้</span>
+                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>ลูกค้าวันที่ {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {day: 'numeric', month: 'short'})}</span>
                               <span className="fw-bold" style={{ fontSize: '1.5rem' }}> {stats.todayCustomers.toLocaleString()} คน</span>
                             </div>
                           </div>
@@ -3040,14 +3097,14 @@ function DashboardOwner() {
                               <i className="fas fa-clipboard-check"></i>
                             </div>
                             <div className="ms-3">
-                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>การจองวันนี้</span>
+                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>การจองวันที่ {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {day: 'numeric', month: 'short'})}</span>
                               <span className="fw-bold" style={{ fontSize: '1.5rem' }}>{stats.todayBookings.toLocaleString()} รายการ</span>
                             </div>
                           </div>
                           <div className="d-flex justify-content-between mt-2">
                             <small className="text-muted">
                               <i className="fas fa-check-circle me-1"></i>
-                              <span>อัตราการยืนยัน 89%</span>
+                              <span>{stats.todayCompletedBookings.toLocaleString()} เสร็จสิ้น</span>
                             </small>
                           </div>
                         </div>
@@ -3826,7 +3883,7 @@ function DashboardOwner() {
                         selectedBooking.paymentStatus === 'รอชำระเงิน' && (
                         <button 
                           className="btn btn-success me-2" 
-                          style={{ background: '#a74428ff', borderColor: '#28a745', color: '#fff', fontWeight: 'bold' }}
+                          style={{ background: '#28a745', borderColor: '#28a745', color: '#fff', fontWeight: 'bold' }}
                           onClick={() => {
                             confirmPayment(selectedBooking.id);
                             setShowBookingDetails(false);

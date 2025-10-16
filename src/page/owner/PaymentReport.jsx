@@ -415,16 +415,32 @@ const PaymentReport = () => {
       
   // เตรียมข้อมูลสำหรับรายงานการชำระเงิน
       const paymentReportData = bookings.map(booking => {
-  // ตรวจสอบและแปลงวันที่
-        let bookingDate;
-        if (booking.bookingDate && typeof booking.bookingDate.toDate === 'function') {
-          bookingDate = booking.bookingDate.toDate();
-        } else if (booking.date && typeof booking.date === 'string') {
-          bookingDate = new Date(booking.date);
-        } else if (booking.date && typeof booking.date.toDate === 'function') {
-          bookingDate = booking.date.toDate();
-        } else {
-          bookingDate = new Date();
+        // ตรวจสอบและแปลงวันที่ (รองรับ bookingDate เป็น string หรือ Timestamp)
+        let bookingDate = null;
+        if (booking.bookingDate) {
+          if (typeof booking.bookingDate.toDate === 'function') {
+            bookingDate = booking.bookingDate.toDate();
+          } else if (typeof booking.bookingDate === 'string') {
+            bookingDate = new Date(booking.bookingDate);
+          }
+        } else if (booking.date) {
+          if (typeof booking.date.toDate === 'function') {
+            bookingDate = booking.date.toDate();
+          } else if (typeof booking.date === 'string') {
+            bookingDate = new Date(booking.date);
+          }
+        } else if (booking.serviceDate) {
+          if (typeof booking.serviceDate.toDate === 'function') {
+            bookingDate = booking.serviceDate.toDate();
+          } else if (typeof booking.serviceDate === 'string') {
+            bookingDate = new Date(booking.serviceDate);
+          }
+        } else if (booking.appointmentDate) {
+          if (typeof booking.appointmentDate.toDate === 'function') {
+            bookingDate = booking.appointmentDate.toDate();
+          } else if (typeof booking.appointmentDate === 'string') {
+            bookingDate = new Date(booking.appointmentDate);
+          }
         }
 
   // ตรวจสอบและแปลงเวลาเริ่มต้น
@@ -795,16 +811,32 @@ const PaymentReport = () => {
                     </tr>
                   ) : (
                       bookings.map((booking) => {
-                      // Determine date object
-                      let bookingDate;
-                      if (booking.bookingDate && typeof booking.bookingDate.toDate === 'function') {
-                        bookingDate = booking.bookingDate.toDate();
-                      } else if (booking.date && typeof booking.date === 'string') {
-                        bookingDate = new Date(booking.date);
-                      } else if (booking.date && typeof booking.date.toDate === 'function') {
-                        bookingDate = booking.date.toDate();
-                      } else {
-                        bookingDate = new Date();
+                      // Determine date object (รองรับ bookingDate เป็น string หรือ Timestamp)
+                      let bookingDate = null;
+                      if (booking.bookingDate) {
+                        if (typeof booking.bookingDate.toDate === 'function') {
+                          bookingDate = booking.bookingDate.toDate();
+                        } else if (typeof booking.bookingDate === 'string') {
+                          bookingDate = new Date(booking.bookingDate);
+                        }
+                      } else if (booking.date) {
+                        if (typeof booking.date.toDate === 'function') {
+                          bookingDate = booking.date.toDate();
+                        } else if (typeof booking.date === 'string') {
+                          bookingDate = new Date(booking.date);
+                        }
+                      } else if (booking.serviceDate) {
+                        if (typeof booking.serviceDate.toDate === 'function') {
+                          bookingDate = booking.serviceDate.toDate();
+                        } else if (typeof booking.serviceDate === 'string') {
+                          bookingDate = new Date(booking.serviceDate);
+                        }
+                      } else if (booking.appointmentDate) {
+                        if (typeof booking.appointmentDate.toDate === 'function') {
+                          bookingDate = booking.appointmentDate.toDate();
+                        } else if (typeof booking.appointmentDate === 'string') {
+                          bookingDate = new Date(booking.appointmentDate);
+                        }
                       }
 
                       // Determine times - รองรับหลายฟิลด์
@@ -899,10 +931,12 @@ const PaymentReport = () => {
                       return (
                         <tr key={booking.id}>
                           <td>
-                            <div className="fw-bold" style={{ color: '#2c3e50' }}>{formatDate(bookingDate)}</div>
+                            <div className="fw-bold" style={{ color: '#2c3e50' }}>
+                              {bookingDate ? formatDate(bookingDate) : '-'}
+                            </div>
                             <small className="text-muted">
                               <i className="far fa-calendar me-1"></i>
-                              {daysAgoText}
+                              {bookingDate ? daysAgoText : ''}
                             </small>
                           </td>
                           <td>

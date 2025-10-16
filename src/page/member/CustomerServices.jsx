@@ -5,6 +5,28 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 function CustomerServices() {
+  // ตรวจสอบว่าพนักงานคนนี้มีคิวซ้อนกับลูกค้าคนอื่นหรือไม่ (อนุญาตให้ user เดิมจองต่อเนื่องได้)
+  async function isEmployeeDoubleBooked(employeeId, date, time, duration, userId) {
+    if (!employeeId || !date || !time) return false;
+    const q = query(
+      collection(db, 'Bookings'),
+      where('employeeId', '==', employeeId),
+      where('bookingDate', '==', date),
+      where('status', 'in', ['รอชำระเงิน', 'จองสำเร็จ', 'ยืนยันแล้ว'])
+    );
+    const snap = await getDocs(q);
+    const [newHour, newMin] = time.split(':').map(Number);
+    const newStart = newHour * 60 + newMin;
+    const newEnd = newStart + duration;
+    return snap.docs.some(doc => {
+      const data = doc.data();
+      if (data.userId === userId) return false; // ข้ามคิวของตัวเอง
+      const [existHour, existMin] = (data.bookingTime || '00:00').split(':').map(Number);
+      const existStart = existHour * 60 + existMin;
+      const existEnd = existStart + (data.duration || 60);
+      return (newStart < existEnd && newEnd > existStart);
+    });
+  }
   const { user } = useAuth();
   const navigate = useNavigate();
   const [services, setServices] = useState([]);
@@ -302,7 +324,7 @@ function CustomerServices() {
   }, []);
 
   // ฟังก์ชันเพิ่มลงตะกร้า
-  const addToCart = (service, date, time, employee) => {
+  const addToCart = async (service, date, time, employee) => {
     if (!date) {
       alert('กรุณาเลือกวันที่');
       return;
@@ -313,11 +335,11 @@ function CustomerServices() {
       return;
     }
 
-    // ตรวจสอบว่าพนักงานที่เลือกยังว่างอยู่
+    // ตรวจสอบคิวซ้อนกับลูกค้าคนอื่น (แต่ให้ user เดิมจองต่อเนื่องได้)
     if (employee) {
-      const availableEmployees = getAvailableEmployees(date, time, service.duration);
-      if (!availableEmployees.some(emp => emp.id === employee)) {
-        alert('ขออภัย พนักงานที่เลือกไม่ว่างในช่วงเวลานี้ กรุณาเลือกพนักงานท่านอื่น หรือเปลี่ยนเวลาจอง');
+      const isDoubleBooked = await isEmployeeDoubleBooked(employee, date, time, service.duration, user?.uid);
+      if (isDoubleBooked) {
+        alert('ขออภัย พนักงานที่เลือกมีคิวในช่วงเวลานี้แล้ว กรุณาเลือกเวลาอื่นหรือเปลี่ยนพนักงาน');
         return;
       }
     }

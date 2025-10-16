@@ -64,7 +64,8 @@ function MemberRewards() {
             pointsCost: data.pointsCost,
             type: data.type,
             value: data.value,
-            validity: data.validity,
+            validity: data.validity, // จำนวนเดือนที่มีอายุใช้งาน (เช่น 1 = 1 เดือน, 3 = 3 เดือน)
+            validityText: data.validity ? `มีอายุใช้งาน ${data.validity} เดือน` : 'ไม่มีวันหมดอายุ',
             icon: data.type === 'discount'
               ? <FaTicketAlt size={24} className="reward-icon" />
               : <FaGift size={24} className="reward-icon" />
@@ -156,13 +157,16 @@ function MemberRewards() {
       });
 
       // 2. บันทึกการแลกรางวัลใน Redemptions
-      // กำหนดวันหมดอายุให้ห่างออกไปมาก ๆ (เสมือนไม่มีวันหมดอายุ)
+      // คำนวณวันหมดอายุตาม validity ที่กำหนด (จำนวนเดือน)
       const validUntil = new Date();
-      validUntil.setFullYear(validUntil.getFullYear() + 100); // เพิ่มไป 100 ปี
+      if (selectedReward.validity && typeof selectedReward.validity === 'number') {
+        // ถ้ามีการกำหนด validity เป็นจำนวนเดือน
+        validUntil.setMonth(validUntil.getMonth() + selectedReward.validity);
+      } else {
+        // กรณีไม่กำหนด validity กำหนดเป็น 100 ปี (ไม่มีวันหมดอายุ)
+        validUntil.setFullYear(validUntil.getFullYear() + 100);
+      }
 
-      // สร้างรหัสแลกรางวัลในรูปแบบ PH ตามด้วยตัวเลข
-      const rewardCode = await generateRewardCode();
-      
       const redemptionData = {
         userId: user.uid,
         rewardId: selectedReward.id,
@@ -173,8 +177,7 @@ function MemberRewards() {
         redeemedAt: new Date(),
         validUntil: validUntil,
         status: 'active',
-        used: false,
-        rewardCode: rewardCode // เพิ่มรหัสแลกรางวัล
+        used: false
       };
       const redemptionRef = await addDoc(collection(db, 'Redemptions'), redemptionData);
 
@@ -191,9 +194,6 @@ function MemberRewards() {
       // อัพเดตสถานะการแลกรางวัล
       setPoints(prev => prev - selectedReward.pointsCost);
       setRedemptionSuccess(true);
-      
-      // เก็บรหัสแลกในข้อมูล selectedReward เพื่อแสดงในหน้าสำเร็จ
-      setSelectedReward({...selectedReward, generatedCode: redemptionData.rewardCode});
       
       // ดึงข้อมูลประวัติการแลกรางวัลล่าสุด
       await fetchUserRedemptions();
@@ -212,41 +212,30 @@ function MemberRewards() {
     setRedeemLoading(false);
   };
 
+
+  // ฟังก์ชันแปลงวันที่ (timestamp/Date/Firestore) เป็น string ไทย
   const formatDate = (date) => {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('th-TH', {
+    let d = date;
+    if (typeof d?.toDate === 'function') d = d.toDate();
+    else if (typeof d === 'string' || typeof d === 'number') d = new Date(d);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('th-TH', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
   };
 
-  const daysRemaining = (validUntil) => {
-    // ไม่ตรวจสอบวันหมดอายุ
-    return validUntil ? 999999 : 0; // ส่งค่าจำนวนวันที่มาก ๆ เพื่อให้ไม่มีวันหมดอายุ
-  };
-
-  // ฟังก์ชันสร้างรหัสแลกรางวัลในรูปแบบ PH ตามด้วยตัวเลข
-  const generateRewardCode = async () => {
-    let code = '';
-    let isUnique = false;
-    
-    while (!isUnique) {
-      // สร้างตัวเลขสุ่ม 6 หลัก
-      const randomDigits = Math.floor(100000 + Math.random() * 900000);
-      code = `PH${randomDigits}`;
-      
-      // ตรวจสอบว่ารหัสนี้มีอยู่แล้วในฐานข้อมูลหรือไม่
-      const q = query(collection(db, 'Redemptions'), where('rewardCode', '==', code));
-      const snap = await getDocs(q);
-      
-      // ถ้าไม่มีรหัสซ้ำในฐานข้อมูล
-      if (snap.empty) {
-        isUnique = true;
-      }
-    }
-    
-    return code;
+  // ฟังก์ชันคำนวณสถานะรางวัล
+  const getRedemptionStatus = (redemption) => {
+    const now = new Date();
+    let validUntil = redemption.validUntil;
+    if (typeof validUntil?.toDate === 'function') validUntil = validUntil.toDate();
+    else if (typeof validUntil === 'string' || typeof validUntil === 'number') validUntil = new Date(validUntil);
+    if (redemption.used) return { label: 'ใช้งานแล้ว', color: 'secondary' };
+    if (validUntil && now > validUntil) return { label: 'หมดอายุ', color: 'danger' };
+    return { label: 'ใช้งานได้', color: 'success' };
   };
 
   if (loading) {
@@ -355,11 +344,21 @@ function MemberRewards() {
                     }}>{reward.name}</h5>
                   </div>
                   
-                  <p className="card-text mb-4" style={{ 
+                  <p className="card-text mb-2" style={{ 
                     color: '#666',
                     fontSize: '0.9rem',
                     minHeight: '60px'
                   }}>{reward.description}</p>
+                  
+                  <div className="validity-info mb-3" style={{
+                    background: 'rgba(52, 152, 219, 0.1)', 
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontSize: '0.85rem'
+                  }}>
+                    <FaClock style={{ color: '#3498db', marginRight: '8px' }} />
+                    <span style={{ color: '#2980b9' }}>{reward.validityText}</span>
+                  </div>
                   
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <div className="reward-points d-flex align-items-center" style={{
@@ -453,7 +452,6 @@ function MemberRewards() {
               <thead className="table-light">
                 <tr>
                   <th>รางวัล</th>
-                  <th>รหัสแลกรางวัล</th>
                   <th>คะแนนที่ใช้</th>
                   <th>วันที่แลก</th>
                   <th>วันหมดอายุ</th>
@@ -461,32 +459,32 @@ function MemberRewards() {
                 </tr>
               </thead>
               <tbody>
-                {userRedemptions.map(redemption => (
-                  <tr key={redemption.id}>
-                    <td>{redemption.rewardName}</td>
-                    <td style={{ 
-                      fontFamily: 'monospace', 
-                      fontWeight: '600',
-                      letterSpacing: '1px'
-                    }}>{redemption.id}</td>
-                    <td>{redemption.pointsUsed} แต้ม</td>
-                    <td>{formatDate(redemption.redeemedAt)}</td>
-                    <td>{formatDate(redemption.validUntil)}</td>
-                    <td>
-                      {redemption.used ? (
-                        <span className="badge bg-secondary">ใช้งานแล้ว</span>
-                      ) : (
-                        <div>
-                          <span className="badge bg-success">ใช้งานได้</span>
+                {userRedemptions.map(redemption => {
+                  const status = getRedemptionStatus(redemption);
+                  return (
+                    <tr key={redemption.id}>
+                      <td>{redemption.rewardName}</td>
+                      <td>{redemption.pointsUsed} แต้ม</td>
+                      <td>{formatDate(redemption.redeemedAt)}</td>
+                      <td>{formatDate(redemption.validUntil)}</td>
+                      <td>
+                        <span className={`badge bg-${status.color}`}>{status.label}</span>
+                        {status.label === 'ใช้งานได้' && (
                           <small className="d-block text-muted mt-1">
                             <FaClock className="me-1" size={12} />
-                            ไม่มีวันหมดอายุ
+                            {redemption.validUntil ? `หมดอายุ: ${formatDate(redemption.validUntil)}` : 'ไม่มีวันหมดอายุ'}
                           </small>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        )}
+                        {status.label === 'หมดอายุ' && (
+                          <small className="d-block text-danger mt-1">
+                            <FaClock className="me-1" size={12} />
+                            หมดอายุแล้ว
+                          </small>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -532,23 +530,6 @@ function MemberRewards() {
                   </div>
                   <h3 className="mb-3" style={{ color: '#2c3e50', fontWeight: '600' }}>แลกรางวัลสำเร็จ!</h3>
                   <p className="text-muted mb-4">คุณได้แลก "{selectedReward.name}" เรียบร้อยแล้ว</p>
-                  <div className="reward-code p-3 mb-3" style={{
-                    background: '#fff3cd',
-                    borderRadius: '15px',
-                    border: '2px dashed #ffc107'
-                  }}>
-                    <h5 className="mb-2" style={{ color: '#7B4019' }}>รหัสแลกรางวัล</h5>
-                    <div style={{ 
-                      fontSize: '2rem', 
-                      fontWeight: '700', 
-                      letterSpacing: '2px',
-                      color: '#2c3e50',
-                      fontFamily: 'monospace'
-                    }}>
-                      {selectedReward.generatedCode}
-                    </div>
-                    <small className="text-muted">กรุณาบันทึกรหัสนี้เพื่อใช้แลกรางวัล</small>
-                  </div>
                   <div className="points-summary p-3 mb-4" style={{
                     background: '#f8f9fa',
                     borderRadius: '15px'
@@ -604,6 +585,10 @@ function MemberRewards() {
                           <p className="text-muted mb-0" style={{ fontSize: '0.9rem' }}>
                             {selectedReward.description}
                           </p>
+                          <div className="mt-2" style={{ fontSize: '0.85rem', color: '#3498db' }}>
+                            <FaClock style={{ marginRight: '5px' }} />
+                            {selectedReward.validityText}
+                          </div>
                         </div>
                       </div>
                       <div className="d-flex align-items-center" style={{

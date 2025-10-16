@@ -1,20 +1,20 @@
 /* Member Dashboard: Primary/Action/Submit Button Styles */
 /* Brown spa style for review submit button */
 .primary-btn, .action-btn.primary-btn, .custom-btn-primary {
-  background: linear-gradient(135deg, #7c4a1e 0%, #a9744f 100%);
+  background: linear-gradient(135deg, #ff9900 0%,  #ff7730  100%);
   border: 2px solid #7c4a1e;
   color: #fff;
   font-weight: 600;
   border-radius: 12px;
   padding: 0.5rem 1.2rem;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(124, 74, 30, 0.10);
+  box-shadow: 0 2px 8px rgba(243, 208, 178, 0.1);
 }
 .primary-btn:hover, .action-btn.primary-btn:hover, .custom-btn-primary:hover {
-  background: linear-gradient(135deg, #a9744f 0%, #7c4a1e 100%);
+  background: linear-gradient(135deg, #ff7730 0%,  #ff9900 100%);
   color: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(124, 74, 30, 0.18);
+  box-shadow: 0 4px 12px rgba(235, 181, 135, 0.18);
 }
 /* Filter Button Styles with distinct colors and animations */
 .filter-btn-all {

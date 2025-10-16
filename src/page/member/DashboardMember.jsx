@@ -26,6 +26,8 @@ function DashboardMember() {
   const [notification, setNotification] = useState({ show: false, title: '', message: '', type: 'info' });
   // สำหรับเก็บ bookings ก่อนหน้าเพื่อเปรียบเทียบการเปลี่ยนแปลงสถานะ
   const [prevBookings, setPrevBookings] = useState([]);
+  // สถานะกำลังรีเฟรชข้อมูล
+  const [refreshing, setRefreshing] = useState(false);
 
   // ฟังก์ชันสำหรับแสดงการแจ้งเตือนแบบ popup
   const showNotification = (title, message, type = 'info') => {
@@ -33,7 +35,7 @@ function DashboardMember() {
     // ซ่อนอัตโนมัติหลัง 10 วินาที
     setTimeout(() => {
       setNotification({ show: false, title: '', message: '', type: 'info' });
-    }, 10000);
+    }, 20000);
   };
 
   // ฟังก์ชันสำหรับซ่อน popup
@@ -355,6 +357,20 @@ function DashboardMember() {
     // อัปเดต prevBookings ทุกครั้งที่ bookings เปลี่ยน
     setPrevBookings(bookings.map(b => ({ id: b.id, status: b.status, canReview: b.canReview })));
   }, [bookings]);
+
+  // ฟังก์ชันสำหรับรีเฟรชข้อมูลด้วยตัวเอง
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchData();
+      showNotification('รีเฟรชข้อมูลสำเร็จ', 'ข้อมูลถูกอัปเดตเป็นเวอร์ชันล่าสุดแล้ว', 'success');
+    } catch (error) {
+      console.error('เกิดข้อผิดพลาดในการรีเฟรชข้อมูล:', error);
+      showNotification('เกิดข้อผิดพลาด', 'ไม่สามารถรีเฟรชข้อมูลได้ กรุณาลองใหม่ภายหลัง', 'error');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // --- รีเฟรชข้อมูลอัตโนมัติ ---
   useEffect(() => {
@@ -780,11 +796,13 @@ function DashboardMember() {
             background: linear-gradient(135deg, #fbbf24, #f59e0b);
             color: white;
             flex: 1;
+            border: none !important;
           }
           .primary-btn:hover {
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
             color: white;
+            border: none !important;
           }
           .secondary-btn {
             background: #f8fafc;
@@ -1093,10 +1111,41 @@ function DashboardMember() {
         {activeTab === 'bookings' && (
           <div className="content-card">
             <div className="card-header bg-gradient text-white p-4" style={{ background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', borderBottom: '3px solid #ff7730' }}>
-              <h4 className="mb-0" style={{ color: '#ff7730' }}>
-                <i className="fas fa-calendar-check me-2"></i>
-                การจองของฉัน
-              </h4>
+              <div className="d-flex justify-content-between align-items-center">
+                <h4 className="mb-0" style={{ color: '#ff7730' }}>
+                  <i className="fas fa-calendar-check me-2"></i>
+                  การจองของฉัน
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleManualRefresh} 
+                  disabled={refreshing}
+                  style={{
+                    backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                    color: '#ff7730',
+                    border: '1px solid #ff7730',
+                    borderRadius: '20px',
+                    padding: '5px 15px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="รีเฟรชข้อมูล"
+                >
+                  {refreshing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      <span className="ms-1">กำลังรีเฟรช...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync-alt"></i>
+                      <span className="ms-1">รีเฟรชข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className="card-body p-4">
               {/* ปุ่มตัวกรอง */}
@@ -1284,15 +1333,6 @@ function DashboardMember() {
                               <div className="card-actions">
                                 <button 
                                   className="action-btn primary-btn" 
-                                  style={{
-                                    background: 'linear-gradient(135deg, #f7b733 0%, #fc9326 100%)',
-                                    border: '1px solid #f7b733',
-                                    color: '#fff',
-                                    fontWeight: '600',
-                                    padding: '6px 20px',
-                                    borderRadius: '6px',
-                                    boxShadow: '0 2px 6px rgba(247, 183, 51, 0.3)'
-                                  }}
                                   onClick={() => navigate(`/member/review/${b.id}`)}
                                 >
                                   <i className="fas fa-star me-1"></i>
@@ -1351,10 +1391,41 @@ function DashboardMember() {
         {activeTab === 'services' && (
           <div className="content-card">
             <div className="card-header bg-gradient text-white p-4" style={{ background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', borderBottom: '3px solid #ff7730' }}>
-              <h4 className="mb-0" style={{ color: '#ff7730' }}>
-                <i className="fas fa-spa me-2"></i>
-                จองบริการ
-              </h4>
+              <div className="d-flex justify-content-between align-items-center">
+                <h4 className="mb-0" style={{ color: '#ff7730' }}>
+                  <i className="fas fa-spa me-2"></i>
+                  จองบริการ
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleManualRefresh} 
+                  disabled={refreshing}
+                  style={{
+                    backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                    color: '#ff7730',
+                    border: '1px solid #ff7730',
+                    borderRadius: '20px',
+                    padding: '5px 15px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="รีเฟรชข้อมูล"
+                >
+                  {refreshing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      <span className="ms-1">กำลังรีเฟรช...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync-alt"></i>
+                      <span className="ms-1">รีเฟรชข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className="card-body p-4">
               <div className="text-center py-5">
@@ -1383,10 +1454,41 @@ function DashboardMember() {
         {activeTab === 'rewards' && (
           <div className="content-card">
             <div className="card-header bg-gradient text-white p-4" style={{ background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', borderBottom: '3px solid #ff7730' }}>
-              <h4 className="mb-0" style={{ color: '#ff7730' }}>
-                <i className="fas fa-gift me-2"></i>
-                แลกรางวัล
-              </h4>
+              <div className="d-flex justify-content-between align-items-center">
+                <h4 className="mb-0" style={{ color: '#ff7730' }}>
+                  <i className="fas fa-gift me-2"></i>
+                  แลกรางวัล
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleManualRefresh} 
+                  disabled={refreshing}
+                  style={{
+                    backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                    color: '#ff7730',
+                    border: '1px solid #ff7730',
+                    borderRadius: '20px',
+                    padding: '5px 15px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="รีเฟรชข้อมูล"
+                >
+                  {refreshing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      <span className="ms-1">กำลังรีเฟรช...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync-alt"></i>
+                      <span className="ms-1">รีเฟรชข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className="card-body p-4">
               <div className="text-center py-5">
@@ -1414,10 +1516,41 @@ function DashboardMember() {
         {activeTab === 'history' && (
           <div className="content-card">
             <div className="card-header bg-gradient text-white p-4" style={{ background: 'linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%)', borderBottom: '3px solid #ff7730' }}>
-              <h4 className="mb-0" style={{ color: '#ff7730' }}>
-                <i className="fas fa-history me-2"></i>
-                ประวัติแต้ม/รายการ
-              </h4>
+              <div className="d-flex justify-content-between align-items-center">
+                <h4 className="mb-0" style={{ color: '#ff7730' }}>
+                  <i className="fas fa-history me-2"></i>
+                  ประวัติแต้ม/รายการ
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleManualRefresh} 
+                  disabled={refreshing}
+                  style={{
+                    backgroundColor: 'rgba(255, 119, 48, 0.1)',
+                    color: '#ff7730',
+                    border: '1px solid #ff7730',
+                    borderRadius: '20px',
+                    padding: '5px 15px',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="รีเฟรชข้อมูล"
+                >
+                  {refreshing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      <span className="ms-1">กำลังรีเฟรช...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-sync-alt"></i>
+                      <span className="ms-1">รีเฟรชข้อมูล</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className="card-body p-4">
               {pointHistory.length === 0 ? (
