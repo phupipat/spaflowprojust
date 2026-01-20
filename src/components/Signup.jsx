@@ -17,12 +17,13 @@ function Signup() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const navigate = useNavigate();
 
+  // [1] ฟังก์ชัน handleSignup ทำหน้าที่รับข้อมูลจากฟอร์มสมัครสมาชิก
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     
-    // ตรวจสอบข้อมูลก่อนส่ง
+    // [2] ตรวจสอบรหัสผ่านและยืนยันรหัสผ่าน
     if (password !== confirmPassword) {
       setError('รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน');
       setLoading(false);
@@ -30,45 +31,45 @@ function Signup() {
     }
     
     if (!name.trim()) {
-      setError('กรุณากรอกชื่อ-นามสกุล');
+      setError('กรุณากรอกชื่อ-นามสกุล'); // [3] ตรวจสอบชื่อ-นามสกุล
       setLoading(false);
       return;
     }
     
     if (password.length < 6) {
-      setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'); //[4] ตรวจสอบความยาวรหัสผ่าน
       setLoading(false);
       return;
     }
     
     if (!agreeTerms) {
-      setError('กรุณายอมรับข้อตกลงการใช้บริการ');
+      setError('กรุณายอมรับข้อตกลงการใช้บริการ'); // [5] ตรวจสอบการยอมรับข้อตกลง
       setLoading(false);
       return;
     }
-    
+    // [6] สร้างบัญชีผู้ใช้ใหม่ด้วย Firebase Auth
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // เพิ่มข้อมูลผู้ใช้ลง Firestore ที่ path: artifacts/{projectId}/users/{uid}
+      // [7] บันทึกข้อมูลผู้ใช้ลง Firestore
       const projectId = 'login-spa-7921d'; // หรือดึงจาก config
-  await setDoc(doc(db, 'artifacts', projectId, 'users', user.uid), {
-  fullname: name,
-  email: user.email,
-  phone: phone,
-  password: password, // เก็บรหัสผ่าน (ควรเข้ารหัสในระบบจริง)
-  role: 'member',
-  status: 'pending',
-  points: 0,
-  timestamp: serverTimestamp(),
+      await setDoc(doc(db, 'artifacts', projectId, 'users', user.uid), {
+      fullname: name,
+      email: user.email,
+      phone: phone,
+      password: password, //[8] เก็บรหัสผ่าน (ควรเข้ารหัสในระบบจริง)
+      role: 'member',
+      status: 'pending',
+      points: 0,
+      timestamp: serverTimestamp(),
       });
 
       // แสดง popup แจ้งว่าลงทะเบียนสำเร็จแล้ว
       const successMessage = 'สมัครสมาชิกเรียบร้อยแล้ว\nกรุณารอการอนุมัติจากเจ้าหน้าที่ เราจะส่งอีเมลแจ้งเมื่อบัญชีของคุณได้รับการอนุมัติ';
       alert(successMessage);
       navigate('/login');
-    } catch (error) {
+    } catch (error) {  // [9] นำผู้ใช้ไปหน้า login  // [10]...จัดการ error...
       console.error('Signup error:', error);
       if (error.code === 'auth/email-already-in-use') {
         setError('อีเมลนี้มีผู้ใช้งานแล้ว');
@@ -78,7 +79,7 @@ function Signup() {
         setError(`เกิดข้อผิดพลาด: ${error.message}`);
       }
     } finally {
-      setLoading(false);
+      setLoading(false); // [11] ปิดสถานะ loading
     }
   };
 

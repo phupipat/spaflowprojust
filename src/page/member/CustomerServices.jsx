@@ -5,6 +5,28 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 function CustomerServices() {
+  // ตรวจสอบว่าพนักงานคนนี้มีคิวซ้อนกับลูกค้าคนอื่นหรือไม่ (อนุญาตให้ user เดิมจองต่อเนื่องได้)
+  async function isEmployeeDoubleBooked(employeeId, date, time, duration, userId) {
+    if (!employeeId || !date || !time) return false;
+    const q = query(
+      collection(db, 'Bookings'),
+      where('employeeId', '==', employeeId),
+      where('bookingDate', '==', date),
+      where('status', 'in', ['รอชำระเงิน', 'จองสำเร็จ', 'ยืนยันแล้ว'])
+    );
+    const snap = await getDocs(q);
+    const [newHour, newMin] = time.split(':').map(Number);
+    const newStart = newHour * 60 + newMin;
+    const newEnd = newStart + duration;
+    return snap.docs.some(doc => {
+      const data = doc.data();
+      if (data.userId === userId) return false; // ข้ามคิวของตัวเอง
+      const [existHour, existMin] = (data.bookingTime || '00:00').split(':').map(Number);
+      const existStart = existHour * 60 + existMin;
+      const existEnd = existStart + (data.duration || 60);
+      return (newStart < existEnd && newEnd > existStart);
+    });
+  }
   const { user } = useAuth();
   const navigate = useNavigate();
   const [services, setServices] = useState([]);
@@ -302,7 +324,7 @@ function CustomerServices() {
   }, []);
 
   // ฟังก์ชันเพิ่มลงตะกร้า
-  const addToCart = (service, date, time, employee) => {
+  const addToCart = async (service, date, time, employee) => {
     if (!date) {
       alert('กรุณาเลือกวันที่');
       return;
@@ -313,11 +335,11 @@ function CustomerServices() {
       return;
     }
 
-    // ตรวจสอบว่าพนักงานที่เลือกยังว่างอยู่
+    // ตรวจสอบคิวซ้อนกับลูกค้าคนอื่น (แต่ให้ user เดิมจองต่อเนื่องได้)
     if (employee) {
-      const availableEmployees = getAvailableEmployees(date, time, service.duration);
-      if (!availableEmployees.some(emp => emp.id === employee)) {
-        alert('ขออภัย พนักงานที่เลือกไม่ว่างในช่วงเวลานี้ กรุณาเลือกพนักงานท่านอื่น หรือเปลี่ยนเวลาจอง');
+      const isDoubleBooked = await isEmployeeDoubleBooked(employee, date, time, service.duration, user?.uid);
+      if (isDoubleBooked) {
+        alert('ขออภัย พนักงานที่เลือกมีคิวในช่วงเวลานี้แล้ว กรุณาเลือกเวลาอื่นหรือเปลี่ยนพนักงาน');
         return;
       }
     }
@@ -387,7 +409,7 @@ function CustomerServices() {
           <i class="fas fa-check-circle" style="font-size: 1.5rem; margin-right: 10px;"></i>
           <div>
             <div style="font-weight: bold; margin-bottom: 5px;">เพิ่มลงตะกร้าสำเร็จ!</div>
-            <div style="font-size: 0.9rem; opacity: 0.9;">\${service.name}</div>
+            <div style="font-size: 0.9rem; opacity: 0.9;">${service.name}</div>
           </div>
         </div>
       </div>
@@ -526,28 +548,29 @@ function CustomerServices() {
         batch.set(pointHistoryRef, pointHistoryData);
       }
 
-      // เพิ่มแต้มรีวิวหลังใช้บริการ 5 แต้ม (เมื่อ reviewed = true)
-      // ตัวอย่าง: สามารถเรียกใช้ logic นี้หลังจากรีวิวจริง หรือในจุดที่ reviewed ถูกเปลี่ยนเป็น true
-      // for (const item of cartItems) {
-      //   if (item.reviewed) {
-      //     const reviewPointId = `PH${Math.floor(100000 + Math.random() * 900000)}`;
-      //     const reviewPointRef = doc(db, 'PointHistory', reviewPointId);
-      //     batch.set(reviewPointRef, {
-      //       userId: user.uid,
-      //       userEmail: user.email,
-      //       points: 5,
-      //       type: 'REVIEW',
-      //       source: 'REVIEW',
-      //       serviceId: item.service.id,
-      //       reason: `ได้รับแต้มจากการรีวิวสินค้า/บริการ ${item.service.name}`,
-      //       status: 'ACTIVE',
-      //       createdAt: Timestamp.now()
-      //     });
-      //   }
-      // }
-
       // Commit batch transaction
       await batch.commit();
+      
+      // อัปเดตแต้มรวมใน Users collection (10 แต้มต่อรายการ)
+      try {
+        const totalEarnedPoints = cartItems.length * 10; // 10 แต้มต่อรายการ
+        const userRef = doc(db, 'artifacts/login-spa-7921d/users', user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          if (userData.points !== undefined) {
+            await updateDoc(userRef, {
+              points: increment(totalEarnedPoints)
+            });
+          } else {
+            await updateDoc(userRef, {
+              points: totalEarnedPoints
+            });
+          }
+        }
+      } catch (pointsUpdateError) {
+        console.error('Error updating user points:', pointsUpdateError);
+      }
       
       clearCart();
       setShowPaymentSuccess(true);
@@ -605,7 +628,7 @@ function CustomerServices() {
     }}>
       {/* Header Section */}
       <div style={{
-        background: 'linear-gradient(135deg, #2c3e50 0%, #1a2a38 100%)',
+        background: 'linear-gradient(135deg, #7B4019 )',
         color: 'white',
         padding: '60px 0 80px',
         position: 'relative',
@@ -634,10 +657,10 @@ function CustomerServices() {
             backdropFilter: 'blur(10px)'
           }}
           onMouseEnter={(e) => {
-            e.target.style.background = 'rgba(255, 153, 0, 0.8)';
-            e.target.style.borderColor = '#ff9900';
+            e.target.style.background = 'rgba(255, 125, 41, 0.8)';
+            e.target.style.borderColor = '#FF7D29';
             e.target.style.transform = 'scale(1.1)';
-            e.target.style.boxShadow = '0 5px 15px rgba(255, 153, 0, 0.4)';
+            e.target.style.boxShadow = '0 5px 15px rgba(255, 125, 41, 0.4)';
           }}
           onMouseLeave={(e) => {
             e.target.style.background = 'rgba(255, 255, 255, 0.1)';
@@ -655,23 +678,23 @@ function CustomerServices() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ff9900" fill-opacity="0.05"%3E%3Ccircle cx="30" cy="30" r="4"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+          background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23FFBF78" fill-opacity="0.05"%3E%3Ccircle cx="30" cy="30" r="4"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
           opacity: 0.3
         }}></div>
         <div className="container text-center" style={{ position: 'relative', zIndex: 2 }}>
           <div style={{
             display: 'inline-block',
-            background: 'rgba(255, 153, 0, 0.2)',
+            background: 'rgba(255, 191, 120, 0.2)',
             borderRadius: '50%',
             padding: '20px',
             marginBottom: '20px'
           }}>
-            <i className="fas fa-spa" style={{ fontSize: '3rem', color: '#ff9900' }}></i>
+            <i className="fas fa-spa" style={{ fontSize: '3rem', color: '#FFBF78' }}></i>
           </div>
           <h1 className="mb-3" style={{ 
             fontSize: '2.5rem',
             fontWeight: 'bold',
-            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
           }}>
             เมนูบริการของเรา
           </h1>
@@ -693,7 +716,7 @@ function CustomerServices() {
           borderRadius: '20px',
           padding: '40px 30px',
           boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-          border: '1px solid rgba(255, 153, 0, 0.1)'
+          border: '1px solid rgba(255, 125, 41, 0.1)'
         }}>
       
           {loading ? (
@@ -701,11 +724,11 @@ function CustomerServices() {
             <div style={{
               display: 'inline-block',
               padding: '30px',
-              background: 'rgba(255, 153, 0, 0.1)',
+              background: 'rgba(255, 125, 41, 0.1)',
               borderRadius: '20px',
               marginBottom: '20px'
             }}>
-              <div className="spinner-border" style={{ color: '#ff9900', width: '3rem', height: '3rem' }} role="status">
+              <div className="spinner-border" style={{ color: '#FF7D29', width: '3rem', height: '3rem' }} role="status">
                 <span className="visually-hidden">กำลังโหลด...</span>
               </div>
             </div>
@@ -718,12 +741,12 @@ function CustomerServices() {
             <div className="row mb-5">
               <div className="col-md-4 mb-3">
                 <div style={{
-                  background: 'linear-gradient(135deg, #ff9900, #ff7730)',
+                  background: 'linear-gradient(135deg, #7B4019)',
                   color: 'white',
                   padding: '25px',
                   borderRadius: '15px',
                   textAlign: 'center',
-                  boxShadow: '0 5px 15px rgba(255, 153, 0, 0.3)'
+                  boxShadow: '0 5px 15px rgba(255, 125, 41, 0.3)'
                 }}>
                   <i className="fas fa-spa fa-2x mb-2"></i>
                   <h4 className="mb-1">{services.length}</h4>
@@ -737,9 +760,9 @@ function CustomerServices() {
                   borderRadius: '15px',
                   textAlign: 'center',
                   boxShadow: '0 5px 15px rgba(44, 62, 80, 0.1)',
-                  border: '1px solid rgba(255, 153, 0, 0.2)'
+                  border: '1px solid rgba(255, 125, 41, 0.2)'
                 }}>
-                  <i className="fas fa-clock fa-2x mb-2" style={{ color: '#ff9900' }}></i>
+                  <i className="fas fa-clock fa-2x mb-2" style={{ color: '#FF7D29' }}></i>
                   <h4 className="mb-1" style={{ color: '#2c3e50' }}>10:00-23:00</h4>
                   <p className="mb-0 text-muted">เวลาทำการ</p>
                 </div>
@@ -751,9 +774,9 @@ function CustomerServices() {
                   borderRadius: '15px',
                   textAlign: 'center',
                   boxShadow: '0 5px 15px rgba(44, 62, 80, 0.1)',
-                  border: '1px solid rgba(255, 153, 0, 0.2)'
+                  border: '1px solid rgba(255, 125, 41, 0.2)'
                 }}>
-                  <i className="fas fa-calendar-check fa-2x mb-2" style={{ color: '#ff9900' }}></i>
+                  <i className="fas fa-calendar-check fa-2x mb-2" style={{ color: '#FF7D29' }}></i>
                   <h4 className="mb-1" style={{ color: '#2c3e50' }}>จองออนไลน์</h4>
                   <p className="mb-0 text-muted">ตลอด 24 ชั่วโมง</p>
                 </div>
@@ -769,7 +792,7 @@ function CustomerServices() {
               display: 'flex', 
               alignItems: 'center' 
             }}>
-              <i className="fas fa-filter me-2" style={{ color: '#ff9900' }}></i>
+              <i className="fas fa-filter me-2" style={{ color: '#FF7D29' }}></i>
               ประเภทบริการ
             </h5>
             <div className="d-flex flex-wrap gap-2 mb-3">
@@ -777,7 +800,7 @@ function CustomerServices() {
                 className="btn shadow-sm"
                 onClick={() => setSelectedType('')}
                 style={{ 
-                  backgroundColor: !selectedType ? '#ff9900' : '#f8f9fa',
+                  backgroundColor: !selectedType ? '#7d380aff' : '#f8f9fa',
                   color: !selectedType ? 'white' : '#6c757d',
                   border: !selectedType ? 'none' : '1px solid #dee2e6',
                   borderRadius: '25px',
@@ -795,7 +818,7 @@ function CustomerServices() {
                   className="btn shadow-sm"
                   onClick={() => setSelectedType(type)}
                   style={{ 
-                    backgroundColor: selectedType === type ? '#ff9900' : '#f8f9fa',
+                    backgroundColor: selectedType === type ? '#7d380aff' : '#f8f9fa',
                     color: selectedType === type ? 'white' : '#6c757d',
                     border: selectedType === type ? 'none' : '1px solid #dee2e6',
                     borderRadius: '25px',
@@ -832,16 +855,16 @@ function CustomerServices() {
           {filteredServices.length === 0 ? (
                 <div className="col-12 text-center py-5">
                   <div style={{
-                    background: 'rgba(255, 153, 0, 0.1)',
+                    background: 'rgba(255, 191, 120, 0.1)',
                     borderRadius: '20px',
                     padding: '50px 30px',
-                    border: '2px dashed rgba(255, 153, 0, 0.3)'
+                    border: '2px dashed rgba(255, 125, 41, 0.3)'
                   }}>
-                    <i className="fas fa-filter fa-4x mb-4" style={{ color: 'rgba(255, 153, 0, 0.5)' }}></i>
+                    <i className="fas fa-filter fa-4x mb-4" style={{ color: 'rgba(255, 125, 41, 0.5)' }}></i>
                     <h4 style={{ color: '#2c3e50', marginBottom: '15px' }}>ไม่พบบริการที่ค้นหา</h4>
                     <p className="text-muted mb-4">
                       {selectedType 
-                        ? <>ไม่พบบริการประเภท <span className="fw-bold" style={{ color: '#ff9900' }}>{selectedType}</span></>
+                        ? <>ไม่พบบริการประเภท <span className="fw-bold" style={{ color: '#FF7D29' }}>{selectedType}</span></>
                         : 'ขณะนี้ยังไม่มีบริการที่เปิดให้บริการ กรุณาติดตามข่าวสารจากทางร้าน'
                       }
                     </p>
@@ -849,13 +872,13 @@ function CustomerServices() {
                       className="btn"
                       onClick={() => setSelectedType('')}
                       style={{
-                        background: 'linear-gradient(45deg, #ff9900, #ff7730)',
+                        background: 'linear-gradient(45deg, #FF7D29, #7B4019)',
                         color: 'white',
                         border: 'none',
                         borderRadius: '25px',
                         padding: '12px 30px',
                         fontWeight: '500',
-                        boxShadow: '0 4px 15px rgba(255, 153, 0, 0.3)'
+                        boxShadow: '0 4px 15px rgba(255, 125, 41, 0.3)'
                       }}
                     >
                       <i className="fas fa-list-ul me-2"></i>แสดงทุกประเภท
@@ -898,13 +921,13 @@ function CustomerServices() {
                       position: 'absolute',
                       top: '15px',
                       right: '15px',
-                      background: 'linear-gradient(45deg, #ff9900, #ff7730)',
+                      background: 'linear-gradient(45deg, #FF7D29, #7B4019)',
                       color: 'white',
                       padding: '8px 12px',
                       borderRadius: '20px',
                       fontSize: '0.85rem',
                       fontWeight: '600',
-                      boxShadow: '0 3px 10px rgba(255, 153, 0, 0.4)'
+                      boxShadow: '0 3px 10px rgba(255, 125, 41, 0.4)'
                     }}>
                       ฿{s.price}
                     </div>
@@ -936,8 +959,8 @@ function CustomerServices() {
                       {s.name}
                     </h5>
                     <div style={{
-                      background: 'rgba(255, 153, 0, 0.1)',
-                      color: '#ff9900',
+                      background: 'rgba(255, 191, 120, 0.1)',
+                      color: '#FF7D29',
                       padding: '4px 8px',
                       borderRadius: '15px',
                       fontSize: '0.75rem',
@@ -952,10 +975,10 @@ function CustomerServices() {
                       background: 'linear-gradient(135deg, #f8f9fa, #e9ecef)',
                       padding: '12px 15px',
                       borderRadius: '12px',
-                      border: '1px solid rgba(255, 153, 0, 0.1)'
+                      border: '1px solid rgba(255, 125, 41, 0.1)'
                     }}>
                       <div style={{
-                        background: 'linear-gradient(45deg, #ff9900, #ff7730)',
+                        background: 'linear-gradient(45deg, #FF7D29, #7B4019)',
                         borderRadius: '50%',
                         padding: '8px',
                         marginRight: '12px'
@@ -964,7 +987,7 @@ function CustomerServices() {
                       </div>
                       <div>
                         <span style={{ color: '#2c3e50', fontWeight: '600' }}>ระยะเวลา</span>
-                        <div style={{ color: '#ff9900', fontWeight: '700', fontSize: '1.1rem' }}>
+                        <div style={{ color: '#FF7D29', fontWeight: '700', fontSize: '1.1rem' }}>
                           {s.duration} นาที
                         </div>
                       </div>
@@ -986,8 +1009,8 @@ function CustomerServices() {
                         }}
                         onMouseEnter={(e) => {
                           e.target.style.background = '#f8f9fa';
-                          e.target.style.borderColor = '#ff9900';
-                          e.target.style.color = '#ff9900';
+                          e.target.style.borderColor = '#FF7D29';
+                          e.target.style.color = '#FF7D29';
                         }}
                         onMouseLeave={(e) => {
                           e.target.style.background = 'transparent';
@@ -1036,7 +1059,7 @@ function CustomerServices() {
               <div className="modal-content" style={{ borderRadius: '15px', border: 'none', background: 'white' }}>
               <div className="modal-header" style={{ background: 'linear-gradient(45deg, #f8f9fa, #e9ecef)', borderBottom: 'none' }}>
                       <h5 className="modal-title fw-bold" id={`detailModalLabel${s.id}`} style={{ color: '#2c3e50' }}>
-                        <i className="fas fa-spa me-2" style={{ color: '#ff9900' }}></i>
+                        <i className="fas fa-spa me-2" style={{ color: '#FF7D29' }}></i>
                         {s.name}
                       </h5>
                       <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -1055,7 +1078,7 @@ function CustomerServices() {
                       <div className="row">
                         <div className="col-md-6">
                           <div className="d-flex align-items-center mb-3">
-                            <i className="far fa-clock me-3" style={{ color: '#ff9900', fontSize: '1.2rem' }}></i>
+                            <i className="far fa-clock me-3" style={{ color: '#FF7D29', fontSize: '1.2rem' }}></i>
                             <div>
                               <strong>ระยะเวลา:</strong>
                               <span className="ms-2">{s.duration} นาที</span>
@@ -1064,10 +1087,10 @@ function CustomerServices() {
                         </div>
                         <div className="col-md-6">
                           <div className="d-flex align-items-center mb-3">
-                            <i className="fas fa-tag me-3" style={{ color: '#ff9900', fontSize: '1.2rem' }}></i>
+                            <i className="fas fa-tag me-3" style={{ color: '#FF7D29', fontSize: '1.2rem' }}></i>
                             <div>
                               <strong>ราคา:</strong>
-                              <span className="ms-2 fw-bold" style={{ color: '#ff9900' }}>฿{s.price}</span>
+                              <span className="ms-2 fw-bold" style={{ color: '#FF7D29' }}>฿{s.price}</span>
                             </div>
                           </div>
                         </div>
@@ -1075,7 +1098,7 @@ function CustomerServices() {
                       {s.type && (
                         <div className="mb-3">
                           <div className="d-flex align-items-center">
-                            <i className="fas fa-spa me-3" style={{ color: '#ff9900', fontSize: '1.2rem' }}></i>
+                            <i className="fas fa-spa me-3" style={{ color: '#FF7D29', fontSize: '1.2rem' }}></i>
                             <div>
                               <strong>ประเภท:</strong>
                               <span className="ms-2">{s.type}</span>
@@ -1086,7 +1109,7 @@ function CustomerServices() {
                       {s.description && (
                         <div className="mt-3">
                           <h6 className="fw-bold mb-2" style={{ color: '#2c3e50' }}>
-                            <i className="fas fa-info-circle me-2" style={{ color: '#ff9900' }}></i>
+                            <i className="fas fa-info-circle me-2" style={{ color: '#FF7D29' }}></i>
                             คำอธิบาย
                           </h6>
                           <p className="text-muted" style={{ lineHeight: 1.6 }}>{s.description}</p>
@@ -1112,7 +1135,7 @@ function CustomerServices() {
                         data-bs-dismiss="modal"
                         onClick={() => setTimeout(() => openBookingModal(s), 300)}
                         style={{ 
-                          background: 'linear-gradient(45deg, #ff9900, #ff7730)',
+                          background: 'linear-gradient(45deg, #FF7D29, #7B4019)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '20px',
@@ -1137,7 +1160,7 @@ function CustomerServices() {
       
       {/* Footer Section */}
       <div style={{
-        background: 'linear-gradient(135deg, #2c3e50 0%, #1a2a38 100%)',
+        background: 'linear-gradient( #7B4019)',
         color: 'white',
         padding: '40px 0',
         marginTop: '60px'
@@ -1145,17 +1168,17 @@ function CustomerServices() {
         <div className="container text-center">
           <div className="row">
             <div className="col-md-4 mb-3">
-              <i className="fas fa-phone fa-2x mb-2" style={{ color: '#ff9900' }}></i>
+              <i className="fas fa-phone fa-2x mb-2" style={{ color: '#ffffffff' }}></i>
               <h6>ติดต่อเรา</h6>
               <p className="mb-0" style={{ color: '#fff' }}>096-342-1553</p>
             </div>
             <div className="col-md-4 mb-3">
-              <i className="fas fa-map-marker-alt fa-2x mb-2" style={{ color: '#ff9900' }}></i>
+              <i className="fas fa-map-marker-alt fa-2x mb-2" style={{ color: '#ffffffff' }}></i>
               <h6>ที่อยู่</h6>
               <p className="mb-0" style={{ color: '#fff' }}>469/2, 469/4 อาคาร Ashton ถ. อโศก - ดินแดง กรุงเทพฯ 10400</p>
             </div>
             <div className="col-md-4 mb-3">
-              <i className="fas fa-clock fa-2x mb-2" style={{ color: '#ff9900' }}></i>
+              <i className="fas fa-clock fa-2x mb-2" style={{ color: '#ffffffff' }}></i>
               <h6>เวลาทำการ</h6>
               <p className="mb-0" style={{ color: '#fff' }}>10:00 - 23:00 น.</p>
             </div>
@@ -1176,7 +1199,7 @@ function CustomerServices() {
       }}>
         {/* Time Display */}
         <div style={{
-          background: 'rgba(44, 62, 80, 0.9)',
+          background: 'rgba(241, 125, 0, 1)',
           color: 'white',
           padding: '8px 15px',
           borderRadius: '20px',
@@ -1200,14 +1223,14 @@ function CustomerServices() {
             className="btn"
             onClick={() => setShowCart(true)}
             style={{
-              background: 'linear-gradient(45deg, #ff9900, #ff7730)',
+              background: 'linear-gradient(45deg, #079d34ff)',
               color: 'white',
               border: 'none',
               borderRadius: '50%',
               width: '65px',
               height: '65px',
               fontSize: '1.8rem',
-              boxShadow: '0 8px 25px rgba(255, 153, 0, 0.4)',
+              boxShadow: '0 8px 25px rgba(255, 125, 41, 0.4)',
               position: 'relative',
               transition: 'all 0.3s ease',
               display: 'flex',
@@ -1216,11 +1239,11 @@ function CustomerServices() {
             }}
             onMouseEnter={(e) => {
               e.target.style.transform = 'scale(1.1) translateY(-2px)';
-              e.target.style.boxShadow = '0 12px 30px rgba(255, 153, 0, 0.5)';
+              e.target.style.boxShadow = '0 12px 30px rgba(255, 125, 41, 0.5)';
             }}
             onMouseLeave={(e) => {
               e.target.style.transform = 'scale(1) translateY(0)';
-              e.target.style.boxShadow = '0 8px 25px rgba(255, 153, 0, 0.4)';
+              e.target.style.boxShadow = '0 8px 25px rgba(255, 125, 41, 0.4)';
             }}
           >
             <i className="fas fa-shopping-cart"></i>
@@ -1260,7 +1283,7 @@ function CustomerServices() {
               borderRadius: '15px',
               padding: '15px',
               boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-              border: '1px solid rgba(255, 153, 0, 0.2)',
+              border: '1px solid rgba(255, 125, 41, 0.2)',
               minWidth: '280px',
               maxWidth: '320px',
               opacity: showCart ? 0 : 1,
@@ -1270,11 +1293,11 @@ function CustomerServices() {
             }}>
               <div className="d-flex align-items-center justify-content-between mb-2">
                 <h6 className="mb-0 fw-bold" style={{ color: '#2c3e50', fontSize: '0.9rem' }}>
-                  <i className="fas fa-shopping-cart me-2" style={{ color: '#ff9900' }}></i>
+                  <i className="fas fa-shopping-cart me-2" style={{ color: '#FF7D29' }}></i>
                   ตะกร้าของคุณ
                 </h6>
                 <span className="badge" style={{ 
-                  background: 'linear-gradient(45deg, #ff9900, #ff7730)', 
+                  background: 'linear-gradient(45deg, #FF7D29, #7B4019)', 
                   fontSize: '0.7rem' 
                 }}>
                   {cartItems.length} รายการ
@@ -1331,7 +1354,7 @@ function CustomerServices() {
               <div className="border-top pt-2">
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <span className="fw-bold">ราคารวม:</span>
-                  <span className="fw-bold" style={{ color: '#ff9900', fontSize: '1.1rem' }}>
+                  <span className="fw-bold" style={{ color: '#FF7D29', fontSize: '1.1rem' }}>
                     ฿{getTotalPrice()}
                   </span>
                 </div>
@@ -1360,7 +1383,7 @@ function CustomerServices() {
         <div className="modal show d-block" tabIndex="-1" onClick={() => setBookingService(null)}>
           <div className="modal-dialog modal-dialog-centered modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-content" style={{ borderRadius: '15px', border: 'none' }}>
-              <div className="modal-header" style={{ background: 'linear-gradient(45deg, #ff9900, #ff7730)', color: 'white', borderBottom: 'none' }}>
+              <div className="modal-header" style={{ background: 'linear-gradient(45deg, #FF7D29, #7B4019)', color: 'white', borderBottom: 'none' }}>
                 <h5 className="modal-title fw-bold">
                   <i className="fas fa-calendar-plus me-2"></i>
                   จองบริการ: {bookingService.name}
@@ -1381,7 +1404,7 @@ function CustomerServices() {
                         className={`nav-link ${activeTab === 'booking' ? 'active' : ''} mb-2`}
                         onClick={() => setActiveTab('booking')}
                         style={{
-                          background: activeTab === 'booking' ? 'linear-gradient(45deg, #ff9900, #ff7730)' : 'transparent',
+                          background: activeTab === 'booking' ? 'linear-gradient(45deg, #FF7D29, #7B4019)' : 'transparent',
                           color: activeTab === 'booking' ? 'white' : '#6c757d',
                           border: 'none',
                           borderRadius: '10px',
@@ -1396,7 +1419,7 @@ function CustomerServices() {
                         className={`nav-link ${activeTab === 'employee' ? 'active' : ''} mb-2`}
                         onClick={() => setActiveTab('employee')}
                         style={{
-                          background: activeTab === 'employee' ? 'linear-gradient(45deg, #ff9900, #ff7730)' : 'transparent',
+                          background: activeTab === 'employee' ? 'linear-gradient(45deg, #FF7D29, #7B4019)' : 'transparent',
                           color: activeTab === 'employee' ? 'white' : '#6c757d',
                           border: 'none',
                           borderRadius: '10px',
@@ -1411,7 +1434,7 @@ function CustomerServices() {
                         className={`nav-link ${activeTab === 'summary' ? 'active' : ''}`}
                         onClick={() => setActiveTab('summary')}
                         style={{
-                          background: activeTab === 'summary' ? 'linear-gradient(45deg, #ff9900, #ff7730)' : 'transparent',
+                          background: activeTab === 'summary' ? 'linear-gradient(45deg, #FF7D29, #7B4019)' : 'transparent',
                           color: activeTab === 'summary' ? 'white' : '#6c757d',
                           border: 'none',
                           borderRadius: '10px',
@@ -1933,7 +1956,7 @@ function CustomerServices() {
                             </>
                           ) : (
                             <>
-                              <i className="fas fa-check me-2"></i>ยืนยันการชำระเงิน
+                              <i className="fas fa-check me-2"></i>ยืนยันการจองบริการทั้งหมด
                             </>
                           )}
                         </button>

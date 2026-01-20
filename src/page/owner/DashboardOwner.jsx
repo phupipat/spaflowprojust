@@ -8,10 +8,11 @@ import UserApproval from './UserApproval';
 import PromotionAdd from './PromotionAdd';
 import PaymentReport from './PaymentReport';
 import { getAuth, signOut, onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy, onSnapshot, increment } from 'firebase/firestore';
 import { db } from '../../Firebase';
 import '../../styles/SharedStyles.css';
 import '../../styles/DashboardStyles.css';
+import * as XLSX from 'xlsx';
 
 function DashboardOwner() {
   const navigate = useNavigate();
@@ -25,11 +26,53 @@ function DashboardOwner() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
-  // สถิติเชิงธุรกิจ
+  // สเตตสำหรับ dropdown เลือกพนักงาน
+  const [employees, setEmployees] = useState([]);
+  const [assigningEmployee, setAssigningEmployee] = useState({}); // { [bookingId]: boolean }
+
+  // ดึงรายชื่อพนักงาน (role เป็น 'employee' หรือ 'staff')
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const usersRef = collection(db, 'artifacts/login-spa-7921d/users');
+        const q = query(usersRef, where('role', 'in', ['employee', 'staff']));
+        const snapshot = await getDocs(q);
+        const emps = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setEmployees(emps);
+      } catch (e) {
+        setEmployees([]);
+      }
+    };
+    fetchEmployees();
+  }, []);
+
+  // ฟังก์ชันสำหรับกำหนดพนักงานให้กับ booking
+  const assignEmployeeToBooking = async (bookingId, employeeId) => {
+    setAssigningEmployee(prev => ({ ...prev, [bookingId]: true }));
+    try {
+      // หา employeeName
+      const emp = employees.find(e => e.id === employeeId);
+      const employeeName = emp ? (emp.fullName || emp.name || emp.displayName || '') : '';
+      const bookingRef = doc(db, 'Bookings', bookingId);
+      await updateDoc(bookingRef, {
+        employeeId,
+        employeeName,
+      });
+      setBookings(bookings => bookings.map(b => b.id === bookingId ? { ...b, employeeId, employeeName } : b));
+      alert('กำหนดพนักงานสำเร็จ');
+    } catch (e) {
+      alert('เกิดข้อผิดพลาดในการกำหนดพนักงาน');
+    }
+    setAssigningEmployee(prev => ({ ...prev, [bookingId]: false }));
+  };
+  // สเตตสำหรับสถิติเชิงธุรกิจ
   const [stats, setStats] = useState({
-    todayRevenue: 0,
+    todayRevenue: 0, // จะถูกใช้เป็นรายได้ตามช่วงวันที่ที่เลือก
     monthRevenue: 0,
-    paymentChannels: {},
+    paymentChannels: {}, // จะถูกใช้เป็นการชำระเงินตามช่วงวันที่ที่เลือก
     todayBookings: 0,
     todayCustomers: 0
   });
@@ -45,12 +88,194 @@ function DashboardOwner() {
       end: new Date().toISOString().split('T')[0]
     }
   });
-  // เพิ่ม state สำหรับปฏิทิน
+
+  // ฟังก์ชันสำหรับส่งออกรายงานเป็น Excel (XLSX)
+  const exportReportToExcel = () => {
+    try {
+      // Build rows from bookings
+      const rows = bookings.map(b => {
+        const bookingDate = getBookingDate(b);
+        let bookingDateStr = '';
+        try {
+          if (bookingDate) {
+            if (typeof bookingDate === 'string') bookingDateStr = bookingDate.length > 10 ? bookingDate.substring(0,10) : bookingDate;
+            else if (bookingDate.toDate && typeof bookingDate.toDate === 'function') bookingDateStr = bookingDate.toDate().toISOString().split('T')[0];
+            else if (bookingDate instanceof Date) bookingDateStr = bookingDate.toISOString().split('T')[0];
+          }
+        } catch (e) { bookingDateStr = '' }
+
+        return {
+          BookingID: b.id || '',
+          Date: bookingDateStr,
+          Time: b.bookingTime || b.time || '',
+          Customer: b.customerFullName || b.customerName || b.fullName || '',
+          CustomerEmail: b.customerEmail || b.userEmail || '',
+          Service: b.service || b.serviceName || '',
+          Employee: b.employeeFullName || b.employeeName || '',
+          Duration: b.duration || '',
+          Price: Number(b.price || b.totalAmount || 0),
+          Status: b.status || '',
+          PaymentStatus: b.paymentStatus || '',
+          PaymentMethod: b.paymentMethod || '',
+          CreatedAt: b.createdAt ? (b.createdAt instanceof Date ? b.createdAt.toISOString() : (b.createdAt.toDate ? b.createdAt.toDate().toISOString() : String(b.createdAt))) : ''
+        };
+      });
+
+      // Summary sheet
+      const summary = [
+        { Metric: 'รายได้วันนี้', Value: stats.todayRevenue },
+        { Metric: 'รายได้เดือนนี้', Value: stats.monthRevenue },
+        { Metric: 'การจองวันนี้', Value: stats.todayBookings },
+        { Metric: 'ลูกค้าวันนี้', Value: stats.todayCustomers }
+      ];
+
+      // Create workbook and worksheets
+      const wb = XLSX.utils.book_new();
+      const wsData = [Object.keys(rows[0] || {})];
+      // push rows
+      rows.forEach(r => {
+        wsData.push(Object.values(r));
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
+
+      const wsSummary = XLSX.utils.json_to_sheet(summary);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+      // Generate binary and trigger download
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/octet-stream' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const fileName = `report_bookings_${new Date().toISOString().slice(0,10)}.xlsx`;
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      console.log('Exported report with', rows.length, 'rows');
+      alert('ดาวน์โหลดรายงาน (Excel) สำเร็จ');
+    } catch (err) {
+      console.error('Error exporting report to Excel:', err);
+      alert('เกิดข้อผิดพลาดขณะดาวน์โหลดรายงาน กรุณาลองใหม่');
+    }
+  };
+  
+  // ฟังก์ชันสำหรับส่งออกรายงานการชำระเงินเป็น Excel (XLSX)
+  const exportPaymentReportToExcel = () => {
+    try {
+      // สร้างข้อมูลเฉพาะรายการชำระเงิน
+      const paymentRows = bookings
+        .filter(b => b.paymentStatus === 'ชำระเงินแล้ว' || b.paymentStatus === 'paid')
+        .map(b => {
+          const bookingDate = getBookingDate(b);
+          let bookingDateStr = '';
+          try {
+            if (bookingDate) {
+              if (typeof bookingDate === 'string') bookingDateStr = bookingDate.length > 10 ? bookingDate.substring(0,10) : bookingDate;
+              else if (bookingDate.toDate && typeof bookingDate.toDate === 'function') bookingDateStr = bookingDate.toDate().toISOString().split('T')[0];
+              else if (bookingDate instanceof Date) bookingDateStr = bookingDate.toISOString().split('T')[0];
+            }
+          } catch (e) { bookingDateStr = '' }
+
+          // วันที่ชำระเงิน
+          let paymentDateStr = '';
+          try {
+            if (b.paymentDate) {
+              if (typeof b.paymentDate === 'string') paymentDateStr = b.paymentDate.length > 10 ? b.paymentDate.substring(0,10) : b.paymentDate;
+              else if (b.paymentDate.toDate && typeof b.paymentDate.toDate === 'function') paymentDateStr = b.paymentDate.toDate().toISOString().split('T')[0];
+              else if (b.paymentDate instanceof Date) paymentDateStr = b.paymentDate.toISOString().split('T')[0];
+            } else if (b.confirmedPaymentAt) {
+              if (typeof b.confirmedPaymentAt === 'string') paymentDateStr = b.confirmedPaymentAt.length > 10 ? b.confirmedPaymentAt.substring(0,10) : b.confirmedPaymentAt;
+              else if (b.confirmedPaymentAt.toDate && typeof b.confirmedPaymentAt.toDate === 'function') paymentDateStr = b.confirmedPaymentAt.toDate().toISOString().split('T')[0];
+              else if (b.confirmedPaymentAt instanceof Date) paymentDateStr = b.confirmedPaymentAt.toISOString().split('T')[0];
+            }
+          } catch (e) { paymentDateStr = '' }
+
+          return {
+            ReceiptID: b.receiptId || b.paymentId || b.id || '',
+            BookingID: b.id || '',
+            BookingDate: bookingDateStr,
+            PaymentDate: paymentDateStr || bookingDateStr,
+            Customer: b.customerFullName || b.customerName || b.fullName || '',
+            CustomerEmail: b.customerEmail || b.userEmail || '',
+            Service: b.service || b.serviceName || '',
+            Amount: Number(b.price || b.totalAmount || b.serviceFee || 0),
+            Discount: Number(b.discount || 0),
+            TotalPaid: Number(b.paidAmount || b.price || b.totalAmount || 0),
+            PaymentMethod: b.paymentMethod || 'ไม่ระบุ',
+            PaymentReference: b.paymentReference || b.transactionId || '',
+            PaymentStatus: b.paymentStatus || '',
+          };
+        });
+
+      // สถิติการชำระเงิน
+      const paymentSummary = [
+        { Metric: 'จำนวนรายการชำระเงินทั้งหมด', Value: paymentRows.length },
+        { Metric: 'รายได้วันนี้', Value: stats.todayRevenue },
+        { Metric: 'รายได้เดือนนี้', Value: stats.monthRevenue },
+      ];
+
+      // เพิ่มข้อมูลช่องทางการชำระเงิน
+      const paymentMethods = {};
+      paymentRows.forEach(payment => {
+        const method = payment.PaymentMethod || 'ไม่ระบุ';
+        paymentMethods[method] = (paymentMethods[method] || 0) + payment.TotalPaid;
+      });
+
+      Object.entries(paymentMethods).forEach(([method, amount]) => {
+        paymentSummary.push({ Metric: `รวมยอดชำระผ่าน ${method}`, Value: amount });
+      });
+
+      // สร้าง workbook และ worksheets
+      const wb = XLSX.utils.book_new();
+      
+      if (paymentRows.length > 0) {
+        const wsData = [Object.keys(paymentRows[0])];
+        paymentRows.forEach(r => {
+          wsData.push(Object.values(r));
+        });
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, 'รายการชำระเงิน');
+      } else {
+        // กรณีไม่มีข้อมูลการชำระเงิน
+        const ws = XLSX.utils.aoa_to_sheet([['ไม่พบข้อมูลการชำระเงิน']]);
+        XLSX.utils.book_append_sheet(wb, ws, 'รายการชำระเงิน');
+      }
+
+      // เพิ่ม sheet สรุป
+      const wsSummary = XLSX.utils.json_to_sheet(paymentSummary);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'สรุปการชำระเงิน');
+
+      // สร้างไฟล์และดาวน์โหลด
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/octet-stream' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const fileName = `payment_report_${new Date().toISOString().slice(0,10)}.xlsx`;
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      console.log('Exported payment report with', paymentRows.length, 'rows');
+      alert('ดาวน์โหลดรายงานการชำระเงิน (Excel) สำเร็จ');
+    } catch (err) {
+      console.error('Error exporting payment report to Excel:', err);
+      alert('เกิดข้อผิดพลาดขณะดาวน์โหลดรายงานการชำระเงิน กรุณาลองใหม่');
+    }
+  };
+  // สเตตสำหรับปฏิทิน
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' หรือ 'bookings'
   
-  // หมวดหมู่เมนู
+  // หมวดหมู่ของเมนู
   const menuCategories = [
     {
       title: "จัดการร้าน",
@@ -213,8 +438,8 @@ function DashboardOwner() {
               const unsubscribe = onSnapshot(collectionRef, (snapshot) => {
                 console.log(`Real-time update from ${collectionName}, changes:`, snapshot.docChanges().length);
                 
-                snapshot.docChanges().forEach(change => {
-                  const docData = change.doc.data();
+                snapshot.docChanges().forEach(async change => {
+                  let docData = change.doc.data();
                   const docId = change.doc.id;
                   
                   // แปลงวันที่เหมือนข้างบน
@@ -242,6 +467,23 @@ function DashboardOwner() {
                     }
                   } catch (e) {}
                   
+                  // ถ้าบันทึกมีเฉพาะ serviceId ให้พยายามดึงชื่อบริการจาก Services ก่อนอัปเดต state
+                  try {
+                    if ((!docData.service || docData.service === '') && docData.serviceId) {
+                      try {
+                        const sDoc = await getDoc(doc(db, 'Services', docData.serviceId));
+                        if (sDoc.exists()) {
+                          const s = sDoc.data();
+                          docData = { ...docData, service: s.name || '', serviceName: s.name || '' };
+                        }
+                      } catch (e) {
+                        console.log('Error resolving service for real-time booking change:', e && e.message ? e.message : e);
+                      }
+                    }
+                  } catch (e) {
+                    console.log('Error checking docData for service enrichment:', e && e.message ? e.message : e);
+                  }
+
                   const formattedData = {
                     id: docId,
                     ...docData,
@@ -293,6 +535,42 @@ function DashboardOwner() {
         
         console.log('Total bookings found:', sortedBookings.length);
         setBookings(sortedBookings);
+              // ตรวจสอบ selectedDate หลัง real-time update ถ้าเป็น null หรือไม่มี booking ในวันนั้น ให้ set เป็นวันแรกที่มี booking
+              if (!selectedDate || !sortedBookings.some(b => {
+                const rawDate = getBookingDate(b);
+                if (!rawDate) return false;
+                let bookingDate;
+                if (typeof rawDate === 'string') {
+                  bookingDate = new Date(rawDate);
+                } else if (rawDate.toDate && typeof rawDate.toDate === 'function') {
+                  bookingDate = rawDate.toDate();
+                } else if (rawDate instanceof Date) {
+                  bookingDate = rawDate;
+                } else {
+                  bookingDate = new Date(rawDate);
+                }
+                const selectedDateStr = selectedDate ? (typeof selectedDate === 'string' ? selectedDate : selectedDate.toISOString().split('T')[0]) : null;
+                return selectedDateStr && bookingDate.toISOString().split('T')[0] === selectedDateStr;
+              })) {
+                // หา booking แรกที่มีในเดือนนี้
+                if (sortedBookings.length > 0) {
+                  const firstBooking = sortedBookings[0];
+                  const rawDate = getBookingDate(firstBooking);
+                  let bookingDate;
+                  if (typeof rawDate === 'string') {
+                    bookingDate = new Date(rawDate);
+                  } else if (rawDate && typeof rawDate.toDate === 'function') {
+                    bookingDate = rawDate.toDate();
+                  } else if (rawDate instanceof Date) {
+                    bookingDate = rawDate;
+                  } else {
+                    bookingDate = new Date(rawDate);
+                  }
+                  setSelectedDate(bookingDate);
+                } else {
+                  setSelectedDate(null);
+                }
+              }
         
         // เพิ่มข้อมูลสรุปสำหรับ debug
         const statusCounts = sortedBookings.reduce((acc, booking) => {
@@ -321,8 +599,8 @@ function DashboardOwner() {
 
     // Set up interval to refresh pending count every 5 minutes
     const pendingTimer = setInterval(fetchPendingCount, 5 * 60 * 1000);
-    // Set up interval to refresh bookings every 2 minutes
-    const bookingsTimer = setInterval(fetchBookings, 2 * 60 * 1000);
+  // Set up interval to refresh bookings every 2 minutes (ใช้ refreshBookings เพื่อให้เหมือนปุ่มรีเฟรช)
+  const bookingsTimer = setInterval(() => refreshBookings(false), 2 * 60 * 1000);
 
     return () => {
       clearInterval(timer);
@@ -332,7 +610,7 @@ function DashboardOwner() {
     };
   }, []);
 
-  // เพิ่ม useEffect สำหรับ debug ข้อมูล
+  // useEffect สำหรับ debug ข้อมูล
   useEffect(() => {
     console.log('=== DEBUG INFO ===');
     console.log('Total bookings:', bookings.length);
@@ -346,7 +624,7 @@ function DashboardOwner() {
     console.log('==================');
   }, [bookings, currentMonth, selectedDate, viewMode]);
 
-  // คำนวณสถิติเชิงธุรกิจเมื่อ bookings เปลี่ยน
+  // useEffect สำหรับคำนวณสถิติเชิงธุรกิจเมื่อ bookings เปลี่ยน
   useEffect(() => {
     const fetchPaymentsAndUpdateStats = async () => {
       if (!bookings || bookings.length === 0) {
@@ -389,17 +667,33 @@ function DashboardOwner() {
           // สร้าง map ของข้อมูลการชำระเงินตาม bookingId
           paymentsSnapshot.docs.forEach(doc => {
             const paymentData = doc.data();
+            const paymentInfo = {
+              docId: doc.id,
+              amount: Number(paymentData.amount || paymentData.totalAmount || 0),
+              paymentMethod: paymentData.paymentMethod || 'cash',
+              paymentStatus: paymentData.paymentStatus || 'รอชำระเงิน',
+              paymentDate: paymentData.paymentDate || paymentData.paidAt || null
+            };
+
+            // บางระบบเก็บ bookingId เป็นสตริงเดียว
             if (paymentData.bookingId) {
-              paymentDetailsMap[paymentData.bookingId] = {
-                amount: Number(paymentData.amount || paymentData.totalAmount || 0),
-                paymentMethod: paymentData.paymentMethod || 'cash',
-                paymentStatus: paymentData.paymentStatus || 'รอชำระเงิน',
-                paymentDate: paymentData.paymentDate || paymentData.paidAt || null
-              };
+              paymentDetailsMap[paymentData.bookingId] = paymentInfo;
+            }
+
+            // หรือเก็บเป็นอาร์เรย์ bookingIds (หลาย booking ในการชำระเงินเดียว)
+            if (Array.isArray(paymentData.bookingIds) && paymentData.bookingIds.length > 0) {
+              paymentData.bookingIds.forEach(bid => {
+                if (bid) paymentDetailsMap[bid] = paymentInfo;
+              });
+            }
+
+            // ถ้าไม่มีทั้งสองแบบ ให้ลองเก็บภายใต้ doc.id (จะใช้ได้เมื่อตาราง booking เก็บ paymentId)
+            if (!paymentData.bookingId && (!paymentData.bookingIds || paymentData.bookingIds.length === 0)) {
+              paymentDetailsMap[doc.id] = paymentInfo; // fallback mapping by payment doc id
             }
           });
-          
-          console.log('Payment details loaded:', Object.keys(paymentDetailsMap).length);
+
+          console.log('Payment details loaded (map size):', Object.keys(paymentDetailsMap).length);
         } else {
           console.log('No payment records found');
         }
@@ -407,12 +701,82 @@ function DashboardOwner() {
         console.error('Error fetching payments data:', error);
       }
 
+      // ถ้ามี booking ที่มีเฉพาะ serviceId ให้พยายามดึงชื่อบริการมาเติม (batch-resolve) ก่อนการคำนวณสถิติ/บริการยอดนิยม
+      const servicesMap = {};
+      try {
+        const missingServiceIds = Array.from(new Set(bookings
+          .filter(b => (!b.service && !b.serviceName) && b.serviceId)
+          .map(b => b.serviceId)));
+
+        if (missingServiceIds.length > 0) {
+          console.log('Resolving service names for stats (serviceIds):', missingServiceIds);
+          for (const sid of missingServiceIds) {
+            try {
+              const sDoc = await getDoc(doc(db, 'Services', sid));
+              if (sDoc.exists()) {
+                const s = sDoc.data();
+                servicesMap[sid] = s.name || '';
+              } else {
+                servicesMap[sid] = '';
+              }
+            } catch (e) {
+              console.log('Error resolving service id for stats:', sid, e && e.message ? e.message : e);
+              servicesMap[sid] = '';
+            }
+          }
+          console.log('Resolved service names count:', Object.keys(servicesMap).length);
+        }
+      } catch (e) {
+        console.log('Error while resolving services for stats:', e);
+      }
+
+      // เพิ่มตัวแปรสำหรับคำนวณรายรับและสถิติต่างๆ ตามวันที่ที่เลือกในตัวเลือกแผนภูมิ
+      let selectedDateRangeRevenue = 0;
+      let selectedDatePaymentChannels = { cash: 0, transfer: 0, credit: 0 };
+      let selectedDateBookings = 0;
+      let selectedDateCustomersSet = new Set();
+      
       bookings.forEach(b => {
         // หาข้อมูลการชำระเงินที่เกี่ยวข้อง
-        const paymentInfo = paymentDetailsMap[b.id] || {};
+        // พยายามแม็ปโดย booking.id, หรือถ้า booking เก็บ paymentId ให้แม็ปโดย payment doc id ด้วย
+        const paymentInfo = paymentDetailsMap[b.id] || (b.paymentId && paymentDetailsMap[b.paymentId]) || (b.paymentDocId && paymentDetailsMap[b.paymentDocId]) || {};
         const isPaid = b.paymentStatus === 'ชำระเงินแล้ว' || paymentInfo.paymentStatus === 'ชำระเงินแล้ว';
         const bookingAmount = paymentInfo.amount || Number(b.price || b.totalAmount || 0);
-        const paymentMethod = paymentInfo.paymentMethod || b.paymentMethod || 'cash';
+
+        // Normalize payment method into expected buckets: 'cash', 'transfer', 'credit'
+        // แปลงค่าช่องทางการชำระเงินให้อยู่ในกลุ่มที่ต้องการ: 'cash' (เงินสด), 'transfer' (โอน/PromptPay/QR), 'credit' (บัตรเครดิต/เดบิต)
+        const rawMethod = (paymentInfo.paymentMethod || b.paymentMethod || '').toString().toLowerCase();
+        let paymentMethod = 'cash';
+        // ถ้าข้อความมีคำที่บ่งชี้ถึงบัตรเครดิต/เดบิต ให้จัดเป็น 'credit'
+        if (rawMethod.includes('credit') || rawMethod.includes('card') || rawMethod.includes('visa') || rawMethod.includes('master')) {
+          paymentMethod = 'credit';
+        // ถ้าข้อความบ่งชี้ถึงการโอนธนาคาร หรือ PromptPay/QR ให้จัดเป็น 'transfer'
+        } else if (rawMethod.includes('transfer') || rawMethod.includes('bank') || rawMethod.includes('promptpay') || rawMethod.includes('qr') || rawMethod.includes('banking')) {
+          paymentMethod = 'transfer';
+        // ถ้ามีคำว่า cash ให้จัดเป็น 'cash'
+        } else if (rawMethod.includes('cash')) {
+          paymentMethod = 'cash';
+        } else if (rawMethod === '') {
+          // fallback: ถ้าไม่มีค่าใน paymentInfo ให้ดูฟิลด์ใน booking แทน
+          const bmethod = (b.paymentMethod || '').toString().toLowerCase();
+          if (bmethod.includes('credit') || bmethod.includes('card')) paymentMethod = 'credit';
+          else if (bmethod.includes('transfer') || bmethod.includes('bank') || bmethod.includes('promptpay')) paymentMethod = 'transfer';
+          else if (bmethod.includes('cash')) paymentMethod = 'cash';
+        } else {
+          // กรณีข้อความไม่รู้จัก พยายามจับคู่คำที่คาดหวัง หากไม่ได้ ให้เก็บค่าเดิมไว้และ log เพื่อดีบั๊ก
+          if (['credit', 'transfer', 'cash'].includes(rawMethod)) paymentMethod = rawMethod;
+          else {
+            paymentMethod = rawMethod; // เก็บค่าเดิมไว้เพื่อช่วย debug
+            console.log('Unrecognized payment method string for booking', b.id, 'rawMethod:', rawMethod);
+          }
+        }
+
+        // Debug: แสดงการแม็ปช่องทางการชำระเงินสำหรับแต่ละ booking (ช่วยตรวจสอบว่าถูกแม็ปเป็นช่องทางใด)
+        if (paymentInfo && Object.keys(paymentInfo).length > 0) {
+          console.log('Payment mapping for booking', b.id, { paymentInfo, rawMethod, resolvedMethod: paymentMethod });
+        } else {
+          console.log('No paymentInfo found for booking', b.id, 'booking.paymentMethod:', b.paymentMethod);
+        }
 
         // เฉพาะที่ชำระเงินแล้ว
         if (isPaid) {
@@ -434,8 +798,30 @@ function DashboardOwner() {
               return;
             }
             
-            const bookingDateStr = bookingDate.toISOString().slice(0, 10);
-            const bookingMonthStr = bookingDate.toISOString().slice(0, 7);
+            // สร้างสตริงวันที่โดยใช้ค่า local date (ไม่ใช้ toISOString เพื่อหลีกเลี่ยงปัญหา timezone)
+            const bookingDateStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${String(bookingDate.getDate()).padStart(2, '0')}`;
+            const bookingMonthStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}`;
+            
+            // เช็คว่าวันที่นี้อยู่ในช่วง chartSettings.dateRange หรือไม่
+            const isInSelectedDateRange = bookingDateStr >= chartSettings.dateRange.start && bookingDateStr <= chartSettings.dateRange.end;
+            
+            // ถ้าอยู่ในช่วงวันที่ที่เลือก ให้เพิ่มรายได้และช่องทางการชำระเงินในช่วงวันที่ที่เลือก
+            if (isInSelectedDateRange) {
+              selectedDateRangeRevenue += bookingAmount;
+              if (selectedDatePaymentChannels[paymentMethod] !== undefined) {
+                selectedDatePaymentChannels[paymentMethod] += bookingAmount;
+              }
+              
+              // เพิ่มนับจำนวนการจองในวันที่เลือก
+              selectedDateBookings += 1;
+              
+              // เพิ่มลูกค้าในวันที่เลือก (ใช้เซตเพื่อไม่นับซ้ำ)
+              if (b.userEmail) selectedDateCustomersSet.add(b.userEmail);
+              if (b.userId) selectedDateCustomersSet.add(b.userId);
+              if (b.customerEmail) selectedDateCustomersSet.add(b.customerEmail);
+              if (b.customer && b.customer.email) selectedDateCustomersSet.add(b.customer.email);
+              if (b.customer && b.customer.id) selectedDateCustomersSet.add(b.customer.id);
+            }
             
             if (bookingDateStr === todayStr) {
               todayRevenue += bookingAmount;
@@ -450,7 +836,7 @@ function DashboardOwner() {
             }
           }
           
-          // รายรับแยกช่องทาง
+          // รายรับแยกช่องทาง (สะสม - ทั้งหมด)
           if (paymentChannels[paymentMethod] !== undefined) {
             paymentChannels[paymentMethod] += bookingAmount;
           }
@@ -474,8 +860,9 @@ function DashboardOwner() {
             return;
           }
           
-          const dateStr = bookingDate.toISOString().slice(0, 10);
-          const monthStr = bookingDate.toISOString().slice(0, 7);
+          // ใช้ local date string เพื่อให้การกรองช่วงวันที่ไม่ผิดเพี้ยนจาก timezone
+          const dateStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${String(bookingDate.getDate()).padStart(2, '0')}`;
+          const monthStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}`;
           
           // กรองตามช่วงวันที่ที่เลือก
           if (dateStr >= chartSettings.dateRange.start && dateStr <= chartSettings.dateRange.end) {
@@ -487,8 +874,9 @@ function DashboardOwner() {
           monthlyBookingsMap[monthStr] = (monthlyBookingsMap[monthStr] || 0) + 1;
         }
 
-        // นับบริการยอดนิยม (กรองตามช่วงวันที่)
-        const service = b.service || b.serviceName;
+  // นับบริการยอดนิยม (กรองตามช่วงวันที่)
+  // ถ้า booking ไม่มีชื่อบริการแต่มี serviceId ให้ใช้ servicesMap ที่ดึงมาเป็น fallback
+  const service = b.service || b.serviceName || (b.serviceId && servicesMap[b.serviceId] ? servicesMap[b.serviceId] : null);
         if (service && dateField) {
           let bookingDate;
           
@@ -505,12 +893,36 @@ function DashboardOwner() {
             return;
           }
           
-          const dateStr = bookingDate.toISOString().slice(0, 10);
+          // สร้างสตริงวันที่แบบ local (ไม่ใช้ toISOString() ที่เป็น UTC) เพื่อให้การกรองช่วงวันที่ตรงกับ input type="date"
+          const dateStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${String(bookingDate.getDate()).padStart(2, '0')}`;
           if (dateStr >= chartSettings.dateRange.start && dateStr <= chartSettings.dateRange.end) {
             serviceCountMap[service] = (serviceCountMap[service] || 0) + 1;
           }
         }
       });
+
+      // Debug: แสดงข้อมูล serviceCountMap และช่วงวันที่ที่ใช้กรอง
+      console.log('DEBUG popular services - chartSettings.dateRange:', chartSettings.dateRange);
+      console.log('DEBUG popular services - raw serviceCountMap:', serviceCountMap);
+      // แสดงตัวอย่าง bookings ที่อยู่ในช่วงวันที่ (สูงสุด 10 รายการ)
+      try {
+        const sampleInRange = bookings.filter(b => {
+          const df = getBookingDate(b);
+          if (!df) return false;
+          let bd;
+          try {
+            if (typeof df === 'string') bd = new Date(df);
+            else if (df.toDate && typeof df.toDate === 'function') bd = df.toDate();
+            else if (df instanceof Date) bd = df;
+            else bd = new Date(df);
+          } catch (e) { return false; }
+          const dateStr = `${bd.getFullYear()}-${String(bd.getMonth() + 1).padStart(2, '0')}-${String(bd.getDate()).padStart(2, '0')}`;
+          return dateStr >= chartSettings.dateRange.start && dateStr <= chartSettings.dateRange.end;
+        }).slice(0, 10);
+        console.log('DEBUG popular services - sample bookings in range:', sampleInRange);
+      } catch (e) {
+        console.log('Error while sampling bookings for popular services debug:', e);
+      }
 
       // แปลงเป็นรูปแบบสำหรับแผนภูมิ
       const dailyBookings = Object.entries(dailyBookingsMap)
@@ -527,13 +939,47 @@ function DashboardOwner() {
         .sort((a, b) => new Date(a.month) - new Date(b.month))
         .slice(-6); // 6 เดือนล่าสุด
 
+      // ใช้รายได้ การจอง ลูกค้า และช่องทางการชำระเงินในช่วงวันที่ที่เลือกแทนค่าเดิม
       setStats({
-        todayRevenue,
+        todayRevenue: selectedDateRangeRevenue, // รายได้ตามวันที่เลือก
         monthRevenue,
-        paymentChannels,
-        todayBookings,
-        todayCustomers: todayCustomersSet.size
+        paymentChannels: selectedDatePaymentChannels, // ช่องทางการชำระเงินตามวันที่เลือก
+        todayBookings: selectedDateBookings, // จำนวนการจองตามวันที่เลือก
+        todayCustomers: selectedDateCustomersSet.size, // จำนวนลูกค้าตามวันที่เลือก (ไม่นับซ้ำ)
+        todayCompletedBookings: bookings.filter(b => {
+          // นับการจองที่สถานะเป็น "เสร็จสิ้น" หรือ "completed"
+          if (!b.status) return false;
+          const status = b.status.toLowerCase();
+          if (status.includes('เสร็จสิ้น') || status.includes('completed') || status.includes('สำเร็จ')) {
+            // ตรวจสอบว่าอยู่ในวันที่เลือกหรือไม่
+            const dateField = getBookingDate(b);
+            if (!dateField) return false;
+            
+            try {
+              let bookingDate;
+              if (typeof dateField === 'string') {
+                bookingDate = new Date(dateField);
+              } else if (dateField.toDate && typeof dateField.toDate === 'function') {
+                bookingDate = dateField.toDate();
+              } else if (dateField instanceof Date) {
+                bookingDate = dateField;
+              }
+              
+              const bookingDateStr = `${bookingDate.getFullYear()}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}-${String(bookingDate.getDate()).padStart(2, '0')}`;
+              return bookingDateStr === chartSettings.dateRange.start;
+            } catch (e) {
+              return false;
+            }
+          }
+          return false;
+        }).length
       });
+
+      // Debug summary: show final payment channel breakdown
+      console.log('Payment channels summary after processing bookings (all):', paymentChannels);
+      console.log('Selected date range payment channels:', selectedDatePaymentChannels);
+      console.log('Selected date range revenue:', selectedDateRangeRevenue);
+      console.log('Date range used:', chartSettings.dateRange);
 
       setChartData({
         dailyBookings,
@@ -553,14 +999,14 @@ function DashboardOwner() {
     fetchPaymentsAndUpdateStats();
   }, [bookings, chartSettings.dateRange]);
 
-  // Handle clicking outside of sidebar on mobile to close it
+  // ฟังก์ชันปิด sidebar เมื่อคลิกนอก sidebar (บนมือถือ)
   const handleOverlayClick = () => {
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
   };
   
-  // Function to refresh pending approvals count
+  // ฟังก์ชันรีเฟรชนับจำนวนรายการรออนุมัติ
   const refreshPendingCount = async () => {
     try {
       const usersRef = collection(db, 'artifacts/login-spa-7921d/users');
@@ -575,7 +1021,7 @@ function DashboardOwner() {
     }
   };
   
-  // ฟังก์ชันสำหรับออกจากระบบ
+  // ฟังก์ชันออกจากระบบ
   const handleLogout = async () => {
     if (!window.confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) return;
     try {
@@ -589,17 +1035,17 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันสำหรับไปยังหน้าโปรไฟล์
+  // ฟังก์ชันไปยังหน้าโปรไฟล์
   const goToProfile = () => {
     navigate('/owner/profile');
   };
 
-  // ฟังก์ชันสำหรับไปยังหน้าตั้งค่าระบบ
+  // ฟังก์ชันไปยังหน้าตั้งค่าระบบ
   const goToSettings = () => {
     navigate('/owner/settings');
   };
 
-  // ฟังก์ชันอนุมัติการจอง
+  // ฟังก์ชันสำหรับอนุมัติการจอง
   const approveBooking = async (bookingId) => {
     try {
       const bookingRef = doc(db, 'Bookings', bookingId);
@@ -608,6 +1054,7 @@ function DashboardOwner() {
         paymentStatus: 'ชำระเงินแล้ว',
         approvedAt: new Date()
       });
+
       // อัปเดต state
       setBookings(bookings.map(booking => 
         booking.id === bookingId 
@@ -621,7 +1068,7 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันปฏิเสธการจอง
+  // ฟังก์ชันสำหรับปฏิเสธการจอง
   const rejectBooking = async (bookingId) => {
     if (!window.confirm('ต้องการปฏิเสธการจองนี้ใช่หรือไม่?')) return;
     
@@ -646,7 +1093,7 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันลบการจอง
+  // ฟังก์ชันสำหรับลบการจอง
   const deleteBooking = async (bookingId) => {
     if (!window.confirm('ต้องการลบการจองนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้')) return;
     
@@ -664,7 +1111,7 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันตรวจสอบคอลเลคชั่น Bookings ทั้งหมด
+  // ฟังก์ชันสำหรับตรวจสอบคอลเลคชั่น Bookings ทั้งหมด
   const debugListAllCollections = async () => {
     try {
       console.log('Attempting to list all collections...');
@@ -725,7 +1172,7 @@ function DashboardOwner() {
     }
   };
 
-  // ฟังก์ชันสำหรับค้นหาการจองด้วย ID โดยตรง (สำหรับตรวจสอบ)
+  // ฟังก์ชันสำหรับค้นหาการจองด้วย ID โดยตรง (สำหรับ debug)
   const checkBookingById = async (bookingId) => {
     try {
       console.log(`Checking for booking with ID: ${bookingId}`);
@@ -770,81 +1217,152 @@ function DashboardOwner() {
   };
   const confirmPayment = async (bookingId) => {
   console.log('DEBUG: confirmPayment bookingId =', bookingId);
-    if (!window.confirm('ยืนยันการชำระเงินสำหรับการจองนี้ใช่หรือไม่?')) return;
-    
-    try {
-      const bookingRef = doc(db, 'Bookings', bookingId);
-      await updateDoc(bookingRef, {
-        paymentStatus: 'ชำระเงินแล้ว',
-        paidAt: new Date(),
-        status: 'ยืนยันแล้ว'
-      });
+  if (!window.confirm('ยืนยันการชำระเงินสำหรับการจองนี้ใช่หรือไม่?')) return;
 
-      // อัปเดต paymentStatus ใน collection Payments ด้วย
-      // ค้นหา payment ที่ bookingId ตรงกัน
-      const paymentsCol = collection(db, 'Payments');
-      const q = query(paymentsCol, where('bookingId', '==', bookingId));
-      const snapshot = await getDocs(q);
-      console.log('DEBUG: Payments found for bookingId', bookingId, snapshot.docs.map(d => ({id: d.id, ...d.data()})));
-      if (!snapshot.empty) {
-        // อัปเดตทุก payment document ที่ bookingId ตรงกัน
-        for (const docSnap of snapshot.docs) {
-          const paymentDocRef = doc(db, 'Payments', docSnap.id);
+  try {
+    console.log('DEBUG confirmPayment start for bookingId:', bookingId, 'booking record snapshot:', bookings.find(b => b.id === bookingId));
+    // อัปเดต Bookings
+    const bookingRef = doc(db, 'Bookings', bookingId);
+    await updateDoc(bookingRef, {
+      paymentStatus: 'ชำระเงินแล้ว',
+      paidAt: new Date(),
+      status: 'ยืนยันแล้ว'
+    });
+
+    // อัปเดต Payments - รองรับหลายรูปแบบการเก็บความสัมพันธ์ระหว่าง booking <-> payment
+    const paymentsCol = collection(db, 'Payments');
+
+    // 1) พยายามค้นหาโดยฟิลด์ bookingId
+    let snapshot = await getDocs(query(paymentsCol, where('bookingId', '==', bookingId)));
+
+    // 2) ถ้าไม่พบ ลองค้นหาโดย array-contains ใน bookingIds (บางระบบเก็บเป็นอาร์เรย์)
+    if (snapshot.empty) {
+      snapshot = await getDocs(query(paymentsCol, where('bookingIds', 'array-contains', bookingId)));
+    }
+
+    // 3) ถ้ายังไม่พบ ให้ดูค่าใน booking เอง (ถ้ามี) เช่น paymentId/paymentDocId แล้วดึงเอกสารตรงๆ
+    let currentBooking = bookings.find(b => b.id === bookingId);
+    if (snapshot.empty && currentBooking) {
+      const pid = currentBooking.paymentId || currentBooking.paymentDocId || currentBooking.payment;
+      if (pid) {
+        try {
+          const pRef = doc(db, 'Payments', pid);
+          const pSnap = await getDoc(pRef);
+          if (pSnap.exists()) {
+            // สร้างรูปแบบให้อยู่ในรูป snapshot.docs เพื่อให้โค้ดด้านล่างทำงานต่อได้
+            snapshot = { docs: [pSnap], empty: false };
+          }
+        } catch (e) {
+          console.error('Error fetching Payments by id fallback:', e);
+        }
+      }
+    }
+
+    if (snapshot.empty) {
+      console.warn(`ไม่พบ Payment document ที่เกี่ยวกับ bookingId = ${bookingId}`);
+      // ไม่ถือเป็น fatal — ยังอัปเดต Booking ไว้แล้ว แจ้งให้ผู้ใช้ตรวจสอบ
+      alert('ไม่พบข้อมูลการชำระเงินใน Payments กรุณาตรวจสอบ (แต่สถานะการจองในระบบถูกอัปเดตแล้ว)');
+    } else {
+      let updateCount = 0;
+      for (const docSnap of snapshot.docs) {
+        try {
+          const pid = docSnap.id;
+          const paymentDocRef = doc(db, 'Payments', pid);
           await updateDoc(paymentDocRef, {
             paymentStatus: 'ชำระเงินแล้ว',
             paidAt: new Date()
           });
+          updateCount++;
+        } catch (err) {
+          console.error(`Error updating paymentStatus for Payments/${docSnap.id}:`, err);
         }
       }
-
-      // อัปเดต state
-      setBookings(bookings.map(booking => 
-        booking.id === bookingId 
-          ? { 
-              ...booking, 
-              paymentStatus: 'ชำระเงินแล้ว', 
-              paidAt: new Date(),
-              status: 'ยืนยันแล้ว'
-            }
-          : booking
-      ));
-      alert('ยืนยันการชำระเงินเรียบร้อยแล้ว');
-    } catch (error) {
-      console.error('Error confirming payment:', error);
-      alert('เกิดข้อผิดพลาดในการยืนยันการชำระเงิน');
+      if (updateCount === 0) {
+        alert('ไม่สามารถอัปเดตสถานะการชำระเงินใน Payments ได้ กรุณาตรวจสอบ');
+      } else {
+        console.log(`อัปเดต paymentStatus ใน Payments สำเร็จ ${updateCount} รายการ`);
+      }
     }
-  };
 
-  // ฟังก์ชันดูรายละเอียดการจอง
+    // อัปเดต state
+    setBookings(bookings.map(booking => 
+      booking.id === bookingId 
+        ? { 
+            ...booking, 
+            paymentStatus: 'ชำระเงินแล้ว', 
+            paidAt: new Date(),
+            status: 'ยืนยันแล้ว'
+          }
+        : booking
+    ));
+    alert('ยืนยันการชำระเงินเรียบร้อยแล้ว');
+  } catch (error) {
+    console.error('Error confirming payment:', error);
+    alert('เกิดข้อผิดพลาดในการยืนยันการชำระเงิน');
+  }
+};
+
+  // ฟังก์ชันสำหรับดูรายละเอียดการจอง
   const viewBookingDetails = async (booking) => {
     try {
-      // ดึงข้อมูล payment จาก collection Payments ด้วย booking.id
+  // ดึงข้อมูลการชำระเงินจากคอลเลคชัน `Payments` โดยใช้ `booking.id`
+  // ขั้นตอนการค้นหา: 1) ตรวจสอบแบบตรง (`where bookingId == booking.id`) 2) หากไม่พบ ให้ fallback ไปยังการค้นหาแบบ `array-contains` ในฟิลด์ `bookingIds`
       let paymentData = {};
       try {
         const paymentsCol = collection(db, 'Payments');
-        const q = query(paymentsCol, where('bookingId', '==', booking.id));
-        const snapshot = await getDocs(q);
+        console.log('Searching Payments for booking.id =', booking.id);
+
+  // 1) ตรวจสอบแบบตรง โดยใช้ฟิลด์ `bookingId`
+        let q = query(paymentsCol, where('bookingId', '==', booking.id));
+        let snapshot = await getDocs(q);
+        console.log('Payments exact match count:', snapshot.size);
+
+        // 2) ถ้าไม่พบ ให้ลองค้นหาโดยใช้ `array-contains` ในฟิลด์ `bookingIds` (บางระบบเก็บหลาย bookingId ในอาร์เรย์)
+        if (snapshot.empty) {
+          console.log('ไม่พบการจับคู่ bookingId ตรงๆ ใน Payments กำลังลองค้นหาแบบ array-contains ใน bookingIds');
+          q = query(paymentsCol, where('bookingIds', 'array-contains', booking.id));
+          snapshot = await getDocs(q);
+          console.log('Payments array-contains match count:', snapshot.size);
+        }
+
         if (!snapshot.empty) {
+          // เลือกเอกสารการชำระเงินรายการแรกที่ตรงกัน
           paymentData = snapshot.docs[0].data();
+          console.log('พบข้อมูลการชำระเงิน:', { id: snapshot.docs[0].id, data: paymentData });
         }
       } catch (err) {
-        // ไม่พบข้อมูล payment
+        console.log('Error fetching payment data:', err);
       }
 
-      // ดึงข้อมูลลูกค้าจาก userId ที่เป็น member
+  // ดึงข้อมูลลูกค้าจาก `userId` ที่เป็นสมาชิก
       let userEmail = booking.userEmail || '';
       let userName = booking.userName || '';
-      let userFullName = booking.fullName || '';
+      let userFullName = booking.fullName || booking.customerFullName || '';
 
-      if (booking.userId) {
+      if (booking.userId || booking.customerId) {
+        const memberId = booking.userId || booking.customerId;
         try {
-          const memberDocRef = doc(db, 'artifacts/login-spa-7921d/users', booking.userId);
+          // ลองดึงจาก document ID ก่อน
+          const memberDocRef = doc(db, 'artifacts/login-spa-7921d/users', memberId);
           const memberSnap = await getDoc(memberDocRef);
           if (memberSnap.exists()) {
             const memberData = memberSnap.data();
-            userEmail = memberData.email || booking.userEmail || '';
+            userEmail = memberData.email || booking.userEmail || booking.customerEmail || '';
             userName = memberData.userName || memberData.displayName || booking.userName || '';
-            userFullName = memberData.fullName || memberData.name || '';
+            userFullName = memberData.fullname || memberData.fullName || memberData.name || booking.fullName || booking.customerFullName || '';
+          } else {
+            // ถ้าไม่พบใน document ID ให้ลองค้นหาด้วย field uid
+            const memberQuery = query(
+              collection(db, 'artifacts/login-spa-7921d/users'),
+              where('uid', '==', memberId)
+            );
+            const memberQuerySnap = await getDocs(memberQuery);
+            if (!memberQuerySnap.empty) {
+              const memberData = memberQuerySnap.docs[0].data();
+              userEmail = memberData.email || booking.userEmail || booking.customerEmail || '';
+              userName = memberData.userName || memberData.displayName || booking.userName || '';
+              userFullName = memberData.fullname || memberData.fullName || memberData.name || booking.fullName || booking.customerFullName || '';
+            }
           }
         } catch (err) {
           console.log('Error fetching member data:', err);
@@ -852,20 +1370,37 @@ function DashboardOwner() {
       }
 
       // ดึง employeeName จาก artifacts/login-spa-7921d/users
-      let employeeName = booking.employeeName || '';
+      let employeeName = booking.employeeName || booking.employeeFullName || '';
+      let employeeFullName = booking.employeeFullName || '';
       if (booking.employeeId) {
         try {
+          // ลองดึงจาก document ID ก่อน
           const userDocRef = doc(db, 'artifacts/login-spa-7921d/users', booking.employeeId);
           const userSnap = await getDoc(userDocRef);
           if (userSnap.exists()) {
             const userData = userSnap.data();
-            if (userData.role === 'employee' && userData.fullName) {
-              employeeName = userData.fullName;
-            } else {
-              employeeName = userData.displayName || userData.name || employeeName;
+            if (userData.role === 'employee' || !userData.role) {
+              employeeName = userData.fullName || userData.displayName || userData.name || employeeName;
+              employeeFullName = userData.fullName || employeeFullName;
+            }
+          } else {
+            // ถ้าไม่พบใน document ID ให้ลองค้นหาด้วย field uid
+            const userQuery = query(
+              collection(db, 'artifacts/login-spa-7921d/users'),
+              where('uid', '==', booking.employeeId)
+            );
+            const userQuerySnap = await getDocs(userQuery);
+            if (!userQuerySnap.empty) {
+              const userData = userQuerySnap.docs[0].data();
+              if (userData.role === 'employee' || !userData.role) {
+                employeeName = userData.fullName || userData.displayName || userData.name || employeeName;
+                employeeFullName = userData.fullName || employeeFullName;
+              }
             }
           }
-        } catch (err) {}
+        } catch (err) {
+          console.log('Error fetching employee data:', err);
+        }
       }
 
       // ดึง serviceName จาก Services
@@ -885,13 +1420,27 @@ function DashboardOwner() {
 
       setSelectedBooking({
         ...booking,
-        userEmail: userEmail || booking.userEmail,
-        userName: userName || booking.userName,
-        fullName: userFullName || booking.fullName,
+        userEmail: userEmail || booking.userEmail || booking.customerEmail,
+        userName: userName || booking.userName || booking.customerName,
+        fullName: userFullName || booking.fullName || booking.customerFullName,
+        customerFullName: userFullName || booking.customerFullName,
         paymentStatus: paymentData.paymentStatus || 'รอชำระเงิน',
         paymentMethod: paymentData.paymentMethod || 'ไม่ระบุ',
-        employeeName,
-        service: serviceName
+        employeeName: employeeName,
+        employeeFullName: employeeFullName,
+        service: serviceName,
+        // Ensure operation history fields are always present
+        approvedAt: booking.approvedAt || null,
+        rejectedAt: booking.rejectedAt || null,
+        cancelledAt: booking.cancelledAt || null,
+        cancelledReason: booking.cancelledReason || null,
+        updatedAt: booking.updatedAt || null,
+        completedAt: booking.completedAt || null,
+        updatedBy: booking.updatedBy || null,
+        updatedByName: booking.updatedByName || null,
+        updatedByRole: booking.updatedByRole || null,
+        updatedById: booking.updatedById || null,
+        updatedByNote: booking.updatedByNote || null
       });
       setShowBookingDetails(true);
     } catch (err) {
@@ -899,8 +1448,8 @@ function DashboardOwner() {
       setShowBookingDetails(true);
     }
   };
-  const refreshBookings = async () => {
-    setLoadingBookings(true);
+  const refreshBookings = async (showAlert = true) => {
+      setLoadingBookings(true);
     try {
       console.log('Refreshing bookings...');
       // ตรวจสอบทั้ง collection ที่เป็นไปได้
@@ -916,6 +1465,30 @@ function DashboardOwner() {
           console.log(`Collection ${collectionName} size:`, snapshot.size);
           
           if (snapshot.size > 0) {
+            console.log('Found documents:', snapshot.size);
+            if (snapshot.size > 0) {
+              console.log('Sample raw booking data (first 3):');
+              snapshot.docs.slice(0, 3).forEach((docSnap, idx) => {
+                const rawData = docSnap.data();
+                console.log(`Booking ${idx + 1}:`, JSON.stringify({
+                  id: docSnap.id,
+                  service: rawData.service,
+                  serviceName: rawData.serviceName,
+                  serviceId: rawData.serviceId,
+                  employeeName: rawData.employeeName,
+                  employeeId: rawData.employeeId,
+                  customerId: rawData.customerId,
+                  userId: rawData.userId,
+                  paymentMethod: rawData.paymentMethod,
+                  paymentStatus: rawData.paymentStatus,
+                  bookingDate: rawData.bookingDate ? 'has value' : 'null',
+                  bookingTime: rawData.bookingTime ? 'has value' : 'null',
+                  startTime: rawData.startTime ? 'has value' : 'null',
+                  createdAt: rawData.createdAt ? 'has value' : 'null'
+                }, null, 2));
+              });
+            }
+            
             foundCollection = true;
             
             // แปลงข้อมูลจาก Firebase
@@ -970,28 +1543,239 @@ function DashboardOwner() {
       }
       
       if (!foundCollection || bookingsData.length === 0) {
-        console.log('No bookings found in any collection');
-        setBookings([]);
+  console.log('No bookings found in any collection');
+  setBookings([]);
+  // ถ้าไม่มี booking เลย ให้ setSelectedDate เป็น null
+  setSelectedDate(null);
+    // ตรวจสอบ selectedDate หลังรีเฟรช ถ้าเป็น null หรือไม่มี booking ในวันนั้น ให้ set เป็นวันแรกที่มี booking
+    if (!selectedDate || !bookingsData.some(b => {
+      const rawDate = getBookingDate(b);
+      if (!rawDate) return false;
+      let bookingDate;
+      if (typeof rawDate === 'string') {
+        bookingDate = new Date(rawDate);
+      } else if (rawDate.toDate && typeof rawDate.toDate === 'function') {
+        bookingDate = rawDate.toDate();
+      } else if (rawDate instanceof Date) {
+        bookingDate = rawDate;
+      } else {
+        bookingDate = new Date(rawDate);
+      }
+      const selectedDateStr = selectedDate ? (typeof selectedDate === 'string' ? selectedDate : selectedDate.toISOString().split('T')[0]) : null;
+      return selectedDateStr && bookingDate.toISOString().split('T')[0] === selectedDateStr;
+    })) {
+      // หา booking แรกที่มีในเดือนนี้
+      if (bookingsData.length > 0) {
+        const firstBooking = bookingsData[0];
+        const rawDate = getBookingDate(firstBooking);
+        let bookingDate;
+        if (typeof rawDate === 'string') {
+          bookingDate = new Date(rawDate);
+        } else if (rawDate && typeof rawDate.toDate === 'function') {
+          bookingDate = rawDate.toDate();
+        } else if (rawDate instanceof Date) {
+          bookingDate = rawDate;
+        } else {
+          bookingDate = new Date(rawDate);
+        }
+        setSelectedDate(bookingDate);
+      } else {
+        setSelectedDate(null);
+      }
+    }
         return;
       }
       
+      // ถ้ามี booking ที่มีเฉพาะ serviceId ให้พยายามดึงชื่อบริการมาเติม
+      try {
+        const serviceIds = Array.from(new Set(bookingsData.filter(b => b.serviceId && !b.service).map(b => b.serviceId)));
+        const servicesMap = {};
+
+        if (serviceIds.length > 0) {
+          console.log('Resolving service names for serviceIds:', serviceIds);
+          for (const sid of serviceIds) {
+            try {
+              const sDoc = await getDoc(doc(db, 'Services', sid));
+              if (sDoc.exists()) {
+                const s = sDoc.data();
+                servicesMap[sid] = s.name || s.serviceName || '';
+              } else {
+                servicesMap[sid] = '';
+              }
+            } catch (e) {
+              console.log('Error fetching Service for id', sid, e && e.message ? e.message : e);
+              servicesMap[sid] = '';
+            }
+          }
+
+          // เติมชื่อบริการเข้าไปใน booking objects
+          bookingsData = bookingsData.map(b => {
+            if ((!b.service || b.service === '') && b.serviceId && servicesMap[b.serviceId]) {
+              return { ...b, service: servicesMap[b.serviceId], serviceName: servicesMap[b.serviceId] };
+            }
+            return b;
+          });
+        }
+      } catch (e) {
+        console.log('Error enriching bookings with services:', e && e.message ? e.message : e);
+      }
+
+      // เติมข้อมูลพนักงานและลูกค้า
+      try {
+        // รวบรวม userIds ที่ต้องการดึงข้อมูล (ทั้งพนักงานและลูกค้า)
+        const allUserIds = Array.from(new Set([
+          ...bookingsData.filter(b => b.employeeId).map(b => b.employeeId),
+          ...bookingsData.filter(b => b.customerId || b.userId).map(b => b.customerId || b.userId)
+        ].filter(Boolean))); // กรองค่า falsy ออก
+        
+        if (allUserIds.length > 0) {
+          console.log('Resolving user data for userIds:', allUserIds);
+          const usersMap = {};
+          
+          // ดึงข้อมูลผู้ใช้ทั้งหมดจากคอลเลคชัน Users
+          for (const uid of allUserIds) {
+            if (!uid) continue;
+            
+            try {
+              // ลองดึงโดยใช้ uid เป็น document ID
+              const userDocRef = doc(db, 'artifacts/login-spa-7921d/users', uid);
+              const userDoc = await getDoc(userDocRef);
+              
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                usersMap[uid] = {
+                  fullName: userData.fullname || userData.fullName || userData.displayName || userData.name || userData.userName || '',
+                  email: userData.email || '',
+                  phone: userData.phone || userData.phoneNumber || '',
+                  role: userData.role || '',
+                  userName: userData.userName || '',
+                  displayName: userData.displayName || ''
+                };
+                console.log(`Found user data for ${uid}:`, usersMap[uid]);
+              } else {
+                // ถ้าไม่พบใน document ID ให้ลองค้นหาด้วย field uid
+                const userQuery = query(
+                  collection(db, 'artifacts/login-spa-7921d/users'),
+                  where('uid', '==', uid)
+                );
+                const userSnapshot = await getDocs(userQuery);
+                
+                if (!userSnapshot.empty) {
+                  const userData = userSnapshot.docs[0].data();
+                  usersMap[uid] = {
+                    fullName: userData.fullname || userData.fullName || userData.displayName || userData.name || userData.userName || '',
+                    email: userData.email || '',
+                    phone: userData.phone || userData.phoneNumber || '',
+                    role: userData.role || '',
+                    userName: userData.userName || '',
+                    displayName: userData.displayName || ''
+                  };
+                  console.log(`Found user data by query for ${uid}:`, usersMap[uid]);
+                } else {
+                  console.log(`No user found for uid: ${uid}`);
+                  usersMap[uid] = { 
+                    fullName: '', 
+                    email: '', 
+                    phone: '', 
+                    role: '', 
+                    userName: '', 
+                    displayName: '' 
+                  };
+                }
+              }
+            } catch (e) {
+              console.log('Error fetching user for id', uid, e && e.message ? e.message : e);
+              usersMap[uid] = { 
+                fullName: '', 
+                email: '', 
+                phone: '', 
+                role: '', 
+                userName: '', 
+                displayName: '' 
+              };
+            }
+          }
+
+          console.log('Complete users map:', usersMap);
+
+          // เติมข้อมูลพนักงานและลูกค้าเข้าไปใน booking objects
+          bookingsData = bookingsData.map(b => {
+            const enrichedBooking = { ...b };
+            
+            // เติมข้อมูลพนักงาน
+            if (b.employeeId && usersMap[b.employeeId]) {
+              const empData = usersMap[b.employeeId];
+              if (empData.role === 'employee' || !empData.role) { // รวมกรณีที่ไม่มี role ด้วย
+                enrichedBooking.employeeName = empData.fullName || empData.displayName || empData.userName || '';
+                enrichedBooking.employeeEmail = empData.email;
+                enrichedBooking.employeePhone = empData.phone;
+                enrichedBooking.employeeFullName = empData.fullName;
+                console.log(`Enriched employee data for booking ${b.id}:`, empData.fullName);
+              }
+            }
+            
+            // เติมข้อมูลลูกค้า
+            const customerId = b.customerId || b.userId;
+            if (customerId && usersMap[customerId]) {
+              const custData = usersMap[customerId];
+              enrichedBooking.customerName = custData.fullName || custData.displayName || custData.userName || '';
+              enrichedBooking.customerEmail = custData.email;
+              enrichedBooking.customerPhone = custData.phone;
+              enrichedBooking.customerFullName = custData.fullName;
+              enrichedBooking.fullName = custData.fullName; // เพิ่มฟิลด์ fullName สำหรับความเข้ากันได้
+              console.log(`Enriched customer data for booking ${b.id}:`, custData.fullName);
+            }
+            
+            return enrichedBooking;
+          });
+          
+          console.log('User data enrichment completed');
+        }
+      } catch (e) {
+        console.log('Error enriching bookings with user data:', e && e.message ? e.message : e);
+      }
+
       // เรียงข้อมูลตามวันที่สร้าง (ใหม่สุดขึ้นก่อน)
       const sortedBookings = bookingsData.sort((a, b) => b.createdAt - a.createdAt);
-      
+
       console.log('Total bookings found after refresh:', sortedBookings.length);
-      setBookings(sortedBookings);
       
-      alert(`โหลดข้อมูลการจอง ${sortedBookings.length} รายการเรียบร้อยแล้ว`);
+      // Debug: แสดงข้อมูลหลัง enrichment (3 รายการแรก)
+      if (sortedBookings.length > 0) {
+        console.log('Sample enriched booking data (first 3):');
+        sortedBookings.slice(0, 3).forEach((booking, idx) => {
+          console.log(`Enriched Booking ${idx + 1}:`, JSON.stringify({
+            id: booking.id,
+            service: booking.service || booking.serviceName,
+            serviceId: booking.serviceId,
+            employeeName: booking.employeeName,
+            employeeId: booking.employeeId,
+            customerName: booking.customerName,
+            customerId: booking.customerId || booking.userId,
+            paymentMethod: booking.paymentMethod,
+            paymentStatus: booking.paymentStatus,
+            normalizedDate: booking.normalizedDate ? booking.normalizedDate.toISOString() : 'null'
+          }, null, 2));
+        });
+      }
+      
+      setBookings(sortedBookings);
+
+      if (showAlert) {
+        alert(`โหลดข้อมูลการจอง ${sortedBookings.length} รายการเรียบร้อยแล้ว`);
+      }
     } catch (error) {
       console.error('Error refreshing bookings:', error);
-      alert('เกิดข้อผิดพลาดในการรีเฟรชข้อมูลการจอง กรุณาลองใหม่อีกครั้ง');
+      if (showAlert) {
+        alert('เกิดข้อผิดพลาดในการรีเฟรชข้อมูลการจอง กรุณาลองใหม่อีกครั้ง');
+      }
       setBookings([]);
     } finally {
       setLoadingBookings(false);
     }
   };
 
-  // ฟังก์ชันสำหรับการจัดการปฏิทิน
+  // ฟังก์ชันสำหรับเปลี่ยนเดือนในปฏิทิน
   const nextMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
   };
@@ -1036,7 +1820,7 @@ function DashboardOwner() {
     setViewMode('bookings'); // เปลี่ยนไปแสดงรายการจอง
   };
 
-  // ฟังก์ชันสร้างปฏิทิน
+  // ฟังก์ชันสำหรับสร้างปฏิทิน
   const generateCalendar = () => {
     const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
     const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
@@ -1173,7 +1957,7 @@ function DashboardOwner() {
     return calendar;
   };
 
-  // ฟังก์ชันดึงวันที่จองจาก booking (รองรับทุกรูปแบบการจัดเก็บวันที่)
+  // ฟังก์ชันสำหรับดึงวันที่จองจาก booking (รองรับทุกรูปแบบการจัดเก็บวันที่)
   function getBookingDate(booking) {
     // ตรวจสอบจากทุกฟิลด์ที่อาจเก็บข้อมูลวันที่
     const possibleDateFields = ['bookingDate', 'date', 'serviceDate', 'appointmentDate'];
@@ -1196,7 +1980,8 @@ function DashboardOwner() {
     return null;
   }
 
-  // ฟังก์ชันกรอง bookings ตามวันที่ที่เลือก
+  // ฟังก์ชันสำหรับกรองการจองตามวันที่ที่เลือก
+  // คืนค่า array ของ bookings ที่ตรงกับวันที่ selectedDate
   const bookingsForSelectedDate = bookings.filter(b => {
     if (!selectedDate) return false;
     const rawDate = getBookingDate(b);
@@ -1608,7 +2393,7 @@ function DashboardOwner() {
                         </button>
                       )}
                       <button className="btn btn-sm" 
-                        onClick={refreshBookings}
+                        onClick={() => refreshBookings(true)}
                         style={{
                           background: 'linear-gradient(135deg, #ff9900 0%, #ff7730 100%)',
                           color: 'white',
@@ -1785,14 +2570,38 @@ function DashboardOwner() {
                           <table className="table table-hover mb-0">
                             <thead style={{ background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)' }}>
                               <tr>
-                                <th scope="col">เวลา</th>
-                                <th scope="col">ลูกค้า</th>
-                                <th scope="col">บริการ</th>
-                                <th scope="col">ระยะเวลา</th>
-                                <th scope="col">ราคา</th>
-                                <th scope="col">พนักงาน</th>
-                                <th scope="col">สถานะ</th>
-                                <th scope="col">การดำเนินการ</th>
+                                <th scope="col">
+                                  <i className="fas fa-clock me-2"></i>
+                                  เวลา
+                                </th>
+                                <th scope="col">
+                                  <i className="fas fa-user me-2"></i>
+                                  ลูกค้า
+                                </th>
+                                <th scope="col">
+                                  <i className="fas fa-spa me-2"></i>
+                                  บริการ
+                                </th>
+                                <th scope="col">
+                                  <i className="fas fa-hourglass-half me-2"></i>
+                                  ระยะเวลา
+                                </th>
+                                <th scope="col">
+                                  <i className="fas fa-money-bill-wave me-2"></i>
+                                  ราคา & การชำระ
+                                </th>
+                                <th scope="col">
+                                  <i className="fas fa-user-tie me-2"></i>
+                                  พนักงาน
+                                </th>
+                                <th scope="col">
+                                  <i className="fas fa-info-circle me-2"></i>
+                                  สถานะ
+                                </th>
+                                <th scope="col">
+                                  <i className="fas fa-cogs me-2"></i>
+                                  การดำเนินการ
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1839,8 +2648,21 @@ function DashboardOwner() {
                                   return (
                                     <tr key={booking.id} className="align-middle">
                                       <td>
-                                        <div className="fw-bold" style={{ color: '#0d6efd', fontSize: '1.1rem' }}>
-                                          {booking.bookingTime ? `${booking.bookingTime} น.` : (booking.time ? `${booking.time} น.` : 'ไม่ระบุ')}
+                                        <div className="text-center">
+                                          <div className="fw-bold" style={{ color: '#0d6efd', fontSize: '1.1rem' }}>
+                                            {booking.bookingTime ? `${booking.bookingTime} น.` : (booking.time ? `${booking.time} น.` : 'ไม่ระบุ')}
+                                          </div>
+                                          {booking.endTime && (
+                                            <small className="text-muted d-block">
+                                              ถึง {booking.endTime} น.
+                                            </small>
+                                          )}
+                                          {booking.createdAt && (
+                                            <small className="text-muted d-block">
+                                              <i className="fas fa-calendar-plus me-1"></i>
+                                              จองเมื่อ: {new Date(booking.createdAt).toLocaleDateString('th-TH')}
+                                            </small>
+                                          )}
                                         </div>
                                       </td>
                                       <td>
@@ -1859,10 +2681,18 @@ function DashboardOwner() {
                                             <i className="fas fa-user" style={{ color: '#6c757d' }}></i>
                                           </div>
                                           <div>
-                                            <div className="text-truncate fw-medium" style={{ maxWidth: '130px' }}>
-                                              {booking.userEmail ? booking.userEmail : (booking.userName ? booking.userName : (booking.fullName ? booking.fullName : 'ไม่ระบุ'))}
+                                            <div className="text-truncate fw-medium" style={{ maxWidth: '150px' }}>
+                                              {booking.customerFullName || booking.customerName || booking.fullName || booking.userEmail || booking.userName || 
+                                               (booking.customerId ? `ลูกค้า (${booking.customerId.substring(0, 6)}...)` : 'ไม่ระบุข้อมูลลูกค้า')}
                                             </div>
-                                            <small className="text-muted">{booking.memberId ? booking.memberId.substring(0, 8) + '...' : (booking.userId ? booking.userId.substring(0, 8) + '...' : '')}</small>
+                                            <small className="text-muted d-block">
+                                              {booking.customerEmail || booking.userEmail || ''}
+                                            </small>
+                                            {(booking.memberId || booking.userId || booking.customerId) && (
+                                              <small className="text-muted d-block">
+                                                ID: {(booking.memberId || booking.userId || booking.customerId).substring(0, 8)}...
+                                              </small>
+                                            )}
                                           </div>
                                         </div>
                                       </td>
@@ -1881,46 +2711,182 @@ function DashboardOwner() {
                                             <i className="fas fa-spa" style={{ color: '#ff7730' }}></i>
                                           </div>
                                           <div>
-                                            <div className="fw-medium">{booking.service || booking.serviceName || (booking.serviceId ? 'กำลังโหลดข้อมูล...' : 'ไม่ระบุ')}</div>
+                                            <div className="fw-medium">
+                                              {booking.service || booking.serviceName || (booking.serviceId ? 'กำลังโหลดข้อมูล...' : 'ไม่ระบุ')}
+                                            </div>
+                                            {booking.serviceId && (
+                                              <small className="text-muted d-block">
+                                                ID: {booking.serviceId.substring(0, 8)}...
+                                              </small>
+                                            )}
+                                            {booking.description && (
+                                              <small className="text-muted d-block" style={{ maxWidth: '150px' }}>
+                                                {booking.description.length > 30 ? 
+                                                  booking.description.substring(0, 30) + '...' : 
+                                                  booking.description}
+                                              </small>
+                                            )}
                                           </div>
                                         </div>
                                       </td>
                                       <td>
-                                        <span className="text-muted">
-                                          {booking.duration ? `${booking.duration} นาที` : 'ไม่ระบุ'}
-                                        </span>
+                                        <div className="text-center">
+                                          <span className="fw-bold text-primary d-block">
+                                            {booking.duration ? `${booking.duration} นาที` : 'ไม่ระบุ'}
+                                          </span>
+                                          {booking.duration && (
+                                            <small className="text-muted d-block">
+                                              {Math.floor(booking.duration / 60) > 0 && `${Math.floor(booking.duration / 60)} ชม. `}
+                                              {booking.duration % 60 > 0 && `${booking.duration % 60} นาที`}
+                                            </small>
+                                          )}
+                                          {booking.appointmentType && (
+                                            <small className="text-muted d-block">
+                                              <i className="fas fa-tag me-1"></i>
+                                              {booking.appointmentType}
+                                            </small>
+                                          )}
+                                        </div>
                                       </td>
                                       <td>
-                                        <span className="fw-bold" style={{ color: '#198754' }}>
-                                          ฿{booking.price || '0'}
-                                        </span>
+                                        <div className="text-center">
+                                          <span className="fw-bold d-block" style={{ color: '#198754', fontSize: '1.1rem' }}>
+                                            ฿{(booking.price || booking.totalAmount || 0).toLocaleString()}
+                                          </span>
+                                          {booking.discount && booking.discount > 0 && (
+                                            <small className="text-warning d-block">
+                                              <i className="fas fa-percent me-1"></i>
+                                              ส่วนลด: ฿{booking.discount.toLocaleString()}
+                                            </small>
+                                          )}
+                                          {booking.paymentMethod && (
+                                            <small className="text-muted d-block">
+                                              <i className="fas fa-credit-card me-1"></i>
+                                              {booking.paymentMethod === 'cash' ? 'เงินสด' : 
+                                               booking.paymentMethod === 'credit' ? 'บัตรเครดิต' : 
+                                               booking.paymentMethod === 'transfer' ? 'โอนเงิน' : 
+                                               booking.paymentMethod}
+                                            </small>
+                                          )}
+                                        </div>
                                       </td>
                                       <td>
-                                        {booking.employeeName ? (
-                                          <div className="d-flex align-items-center">
-                                            <div style={{
-                                              width: 30,
-                                              height: 30,
-                                              borderRadius: '50%',
-                                              background: 'rgba(13, 110, 253, 0.1)',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              marginRight: '8px'
-                                            }}>
-                                              <i className="fas fa-user-tie" style={{ color: '#0d6efd' }}></i>
+                                          {booking.employeeFullName || booking.employeeName ? (
+                                            <div className="d-flex align-items-center">
+                                              <div style={{
+                                                width: 38,
+                                                height: 38,
+                                                borderRadius: '50%',
+                                                background: 'linear-gradient(135deg, rgba(13, 110, 253, 0.1) 0%, rgba(13, 110, 253, 0.2) 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                marginRight: '10px',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                                              }}>
+                                                <i className="fas fa-user-tie" style={{ color: '#0d6efd' }}></i>
+                                              </div>
+                                              <div>
+                                                <div className="fw-medium">
+                                                  {booking.employeeFullName || booking.employeeName}
+                                                </div>
+                                                {booking.employeeId && (
+                                                  <small className="text-muted d-block">
+                                                    ID: {booking.employeeId.substring(0, 8)}...
+                                                  </small>
+                                                )}
+                                              </div>
                                             </div>
-                                            <span>{booking.employeeName}</span>
-                                          </div>
-                                        ) : (
-                                          <span className="text-muted">ยังไม่กำหนด</span>
-                                        )}
+                                          ) : (
+                                            <div className="text-center">
+                                              <div className="mb-2">
+                                                <span className="badge bg-warning text-dark px-3 py-2">
+                                                  <i className="fas fa-exclamation-circle me-1"></i>
+                                                  ยังไม่กำหนดพนักงาน
+                                                </span>
+                                              </div>
+                                              <div className="employee-select-container" style={{ position: 'relative' }}>
+                                                {assigningEmployee && assigningEmployee[booking.id] ? (
+                                                  <div className="text-center py-2">
+                                                    <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                                      <span className="visually-hidden">Loading...</span>
+                                                    </div>
+                                                    <span className="small">กำลังบันทึก...</span>
+                                                  </div>
+                                                ) : (
+                                                  <div className="select-wrapper" style={{ 
+                                                    position: 'relative', 
+                                                    borderRadius: '6px',
+                                                    boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                                                    overflow: 'hidden'
+                                                  }}>
+                                                    <select
+                                                      className="form-select form-select-sm border-primary"
+                                                      style={{ 
+                                                        minWidth: 180,
+                                                        paddingRight: '30px',
+                                                        borderColor: '#e0e6ff',
+                                                        background: 'linear-gradient(to bottom, #fcfdff 0%, #f5f8ff 100%)'
+                                                      }}
+                                                      value={''}
+                                                      onChange={e => assignEmployeeToBooking(booking.id, e.target.value)}
+                                                      disabled={assigningEmployee && assigningEmployee[booking.id]}
+                                                    >
+                                                      <option value='' disabled>-- เลือกพนักงาน --</option>
+                                                      {employees && employees.length > 0 ? (
+                                                        employees.map(emp => (
+                                                          <option key={emp.id} value={emp.id}>
+                                                            {emp.fullName || emp.name || emp.displayName || emp.email}
+                                                          </option>
+                                                        ))
+                                                      ) : (
+                                                        <option value='' disabled>ไม่มีข้อมูลพนักงาน</option>
+                                                      )}
+                                                    </select>
+                                                    <div style={{ 
+                                                      position: 'absolute', 
+                                                      top: 0, 
+                                                      right: 0, 
+                                                      height: '100%',
+                                                      width: '25px',
+                                                      pointerEvents: 'none',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center'
+                                                    }}>
+                                                      <i className="fas fa-user-plus text-primary"></i>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )}
                                       </td>
                                       <td>
-                                        <span className={`badge ${status.class} rounded-pill`}>
-                                          <i className={`fas ${status.icon} me-1`}></i>
-                                          {booking.status || 'รอชำระเงิน'}
-                                        </span>
+                                        <div className="text-center">
+                                          <span className={`badge ${status.class} rounded-pill px-3 py-2`} style={{ fontSize: '0.85rem' }}>
+                                            <i className={`fas ${status.icon} me-1`}></i>
+                                            {booking.status || 'รอชำระเงิน'}
+                                          </span>
+                                          {booking.paymentStatus && booking.paymentStatus !== booking.status && (
+                                            <small className="text-muted d-block mt-1">
+                                              <i className="fas fa-credit-card me-1"></i>
+                                              {booking.paymentStatus}
+                                            </small>
+                                          )}
+                                          {booking.approvedAt && (
+                                            <small className="text-success d-block mt-1">
+                                              <i className="fas fa-check me-1"></i>
+                                              อนุมัติแล้ว
+                                            </small>
+                                          )}
+                                          {booking.rejectedAt && (
+                                            <small className="text-danger d-block mt-1">
+                                              <i className="fas fa-times me-1"></i>
+                                              ปฏิเสธแล้ว
+                                            </small>
+                                          )}
+                                        </div>
                                       </td>
                                       <td>
                                         <div className="d-flex justify-content-center gap-1">
@@ -2010,26 +2976,12 @@ function DashboardOwner() {
                       รายงานรายได้
                     </h4>
                     <div className="d-flex gap-2">
-                      <select 
-                        className="form-select form-select-sm"
-                        style={{
-                          maxWidth: '180px',
-                          borderRadius: '8px',
-                          borderColor: '#ddd'
-                        }}
-                      >
-                        <option value="today">วันนี้</option>
-                        <option value="yesterday">เมื่อวาน</option>
-                        <option value="week">7 วันล่าสุด</option>
-                        <option value="month">เดือนนี้</option>
-                        <option value="lastMonth">เดือนที่แล้ว</option>
-                      </select>
                       <button className="btn btn-sm" style={{ 
                         background: 'linear-gradient(135deg, #ff9900 0%, #ff7730 100%)',
                         color: 'white', 
                         border: 'none', 
                         borderRadius: '8px' 
-                      }}>
+                      }} onClick={() => exportReportToExcel()}>
                         <i className="fas fa-download me-1"></i> ดาวน์โหลดรายงาน
                       </button>
                     </div>
@@ -2050,21 +3002,17 @@ function DashboardOwner() {
                               color: '#ff7730',
                               fontSize: '24px'
                             }}>
-                              <i className="fas fa-wallet"></i>
+                                <i className="fas fa-wallet"></i>
                             </div>
                             <div className="ms-3">
-                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>รายได้วันนี้</span>
+                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>รายได้วันที่ {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {day: 'numeric', month: 'short'})}</span>
                               <span className="fw-bold" style={{ fontSize: '1.5rem' }}>฿{stats.todayRevenue.toLocaleString()}</span>
                             </div>
                           </div>
                           <div className="d-flex justify-content-between mt-2">
-                            <small className="text-success">
-                              <i className="fas fa-arrow-up me-1"></i>
-                              <span>+12% จากเมื่อวาน</span>
-                            </small>
                             <small className="text-muted">
                               <i className="far fa-calendar-alt me-1"></i>
-                              <span>{new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>
+                              <span>ข้อมูล ณ วันที่ {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {day: 'numeric', month: 'short'})}</span>
                             </small>
                           </div>
                         </div>
@@ -2088,18 +3036,13 @@ function DashboardOwner() {
                               <i className="fas fa-calendar-alt"></i>
                             </div>
                             <div className="ms-3">
-                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>รายได้เดือนนี้</span>
+                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>รายได้เดือน {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {month: 'long'})}</span>
                               <span className="fw-bold" style={{ fontSize: '1.5rem' }}>฿{stats.monthRevenue.toLocaleString()}</span>
                             </div>
                           </div>
                           <div className="d-flex justify-content-between mt-2">
-                            <small className="text-success">
-                              <i className="fas fa-arrow-up me-1"></i>
-                              <span>+5% จากเดือนที่แล้ว</span>
-                            </small>
                             <small className="text-muted">
-                              <i className="far fa-calendar me-1"></i>
-                              <span>{new Date().toLocaleDateString('th-TH', { month: 'long' })}</span>
+                              <span>&nbsp;</span>
                             </small>
                           </div>
                         </div>
@@ -2123,15 +3066,11 @@ function DashboardOwner() {
                               <i className="fas fa-users"></i>
                             </div>
                             <div className="ms-3">
-                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>ลูกค้าวันนี้</span>
+                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>ลูกค้าวันที่ {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {day: 'numeric', month: 'short'})}</span>
                               <span className="fw-bold" style={{ fontSize: '1.5rem' }}> {stats.todayCustomers.toLocaleString()} คน</span>
                             </div>
                           </div>
                           <div className="d-flex justify-content-between mt-2">
-                            <small className="text-success">
-                              <i className="fas fa-arrow-up me-1"></i>
-                              <span>+8% จากค่าเฉลี่ย</span>
-                            </small>
                             <small className="text-muted">
                               <i className="fas fa-dollar-sign me-1"></i>
                               <span>฿{Math.round(stats.todayRevenue / (stats.todayCustomers || 1)).toLocaleString()}/คน</span>
@@ -2158,18 +3097,14 @@ function DashboardOwner() {
                               <i className="fas fa-clipboard-check"></i>
                             </div>
                             <div className="ms-3">
-                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>การจองวันนี้</span>
+                              <span className="d-block text-muted" style={{ fontSize: '0.85rem' }}>การจองวันที่ {new Date(chartSettings.dateRange.start).toLocaleDateString('th-TH', {day: 'numeric', month: 'short'})}</span>
                               <span className="fw-bold" style={{ fontSize: '1.5rem' }}>{stats.todayBookings.toLocaleString()} รายการ</span>
                             </div>
                           </div>
                           <div className="d-flex justify-content-between mt-2">
-                            <small className="text-success">
-                              <i className="fas fa-arrow-up me-1"></i>
-                              <span>+3 จากเมื่อวาน</span>
-                            </small>
                             <small className="text-muted">
                               <i className="fas fa-check-circle me-1"></i>
-                              <span>อัตราการยืนยัน 89%</span>
+                              <span>{stats.todayCompletedBookings.toLocaleString()} เสร็จสิ้น</span>
                             </small>
                           </div>
                         </div>
@@ -2315,7 +3250,7 @@ function DashboardOwner() {
                                 <div className="btn-group" role="group">
                                   <button 
                                     type="button" 
-                                    className={`btn btn-sm ${chartSettings.viewType === 'daily' ? 'btn-primary' : 'btn-outline-primary'}`}
+                                    className={`btn btn-sm ${chartSettings.viewType === 'daily' ? 'btn-brown' : 'btn-outline-secondary'}`}
                                     onClick={() => setChartSettings(prev => ({ ...prev, viewType: 'daily' }))}
                                   >
                                     <i className="fas fa-calendar-day me-1"></i>
@@ -2323,7 +3258,7 @@ function DashboardOwner() {
                                   </button>
                                   <button 
                                     type="button" 
-                                    className={`btn btn-sm ${chartSettings.viewType === 'monthly' ? 'btn-primary' : 'btn-outline-primary'}`}
+                                    className={`btn btn-sm ${chartSettings.viewType === 'monthly' ? 'btn-brown' : 'btn-outline-secondary'}`}
                                     onClick={() => setChartSettings(prev => ({ ...prev, viewType: 'monthly' }))}
                                   >
                                     <i className="fas fa-calendar-alt me-1"></i>
@@ -2605,16 +3540,16 @@ function DashboardOwner() {
       
       {/* Modal แสดงรายละเอียดการจอง */}
       {showBookingDetails && selectedBooking && (
-        <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex="-1">
+  <div className="modal fade show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }} tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content" style={{ borderRadius: '15px', border: 'none', overflow: 'hidden' }}>
               <div className="modal-header" style={{ 
-                background: 'linear-gradient(135deg, #2c3e50 0%, #1a1a1a 100%)', 
+                background: '#5D4037',
                 color: 'white',
                 border: 'none'
               }}>
-                <h5 className="modal-title">
-                  <i className="fas fa-info-circle me-2" style={{ color: '#ff7730' }}></i>
+                <h5 className="modal-title" style={{ color: 'white' }}>
+                  <i className="fas fa-info-circle me-2" style={{ color: 'white' }}></i>
                   รายละเอียดการจอง - {selectedBooking.id}
                 </h5>
                 <button 
@@ -2627,33 +3562,25 @@ function DashboardOwner() {
                 <div className="row mb-4">
                   <div className="col-md-6">
                     <div className="card h-100" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
-                        <h6 className="mb-0">
-                          <i className="fas fa-user me-2" style={{ color: '#ff7730' }}></i>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
+                        <h6 className="mb-0" style={{ color: 'white' }}>
+                          <i className="fas fa-user me-2" style={{ color: 'white' }}></i>
                           ข้อมูลลูกค้า
                         </h6>
                       </div>
                       <div className="card-body">
                         <div className="mb-3">
                           <small className="text-muted d-block">อีเมล</small>
-                          <div className="fw-medium">{selectedBooking.userEmail || 'ไม่ระบุ'}</div>
+                          <div className="fw-medium">{selectedBooking.userEmail || selectedBooking.customerEmail || 'ไม่ระบุ'}</div>
                         </div>
-                        {selectedBooking.userName && (
-                          <div className="mb-3">
-                            <small className="text-muted d-block">ชื่อผู้ใช้</small>
-                            <div className="fw-medium">{selectedBooking.userName}</div>
-                          </div>
-                        )}
-                        {selectedBooking.fullName && (
-                          <div className="mb-3">
-                            <small className="text-muted d-block">ชื่อ-นามสกุล</small>
-                            <div className="fw-medium">{selectedBooking.fullName}</div>
-                          </div>
-                        )}
                         <div className="mb-3">
-                          <small className="text-muted d-block">รหัสสมาชิก</small>
+                          <small className="text-muted d-block">ชื่อ-นามสกุล</small>
+                          <div className="fw-medium">{selectedBooking.customerFullName || selectedBooking.fullName || selectedBooking.customerName || 'ไม่ระบุข้อมูลลูกค้า'}</div>
+                        </div>
+                        <div className="mb-3">
+                          <small className="text-muted d-block">รหัสลูกค้า</small>
                           <div className="fw-medium">
-                            {selectedBooking.userId || selectedBooking.memberId || 'ไม่ระบุ'}
+                            {selectedBooking.userId || selectedBooking.customerId || selectedBooking.memberId || 'ไม่ระบุ'}
                           </div>
                         </div>
                         <div>
@@ -2675,9 +3602,9 @@ function DashboardOwner() {
                   </div>
                   <div className="col-md-6">
                     <div className="card h-100" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
-                        <h6 className="mb-0">
-                          <i className="fas fa-spa me-2" style={{ color: '#ff7730' }}></i>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
+                        <h6 className="mb-0" style={{ color: 'white' }}>
+                          <i className="fas fa-spa me-2" style={{ color: 'white' }}></i>
                           ข้อมูลบริการ
                         </h6>
                       </div>
@@ -2707,9 +3634,9 @@ function DashboardOwner() {
                 <div className="row mb-4">
                   <div className="col-md-6">
                     <div className="card h-100" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
-                        <h6 className="mb-0">
-                          <i className="fas fa-calendar-alt me-2" style={{ color: '#ff7730' }}></i>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
+                        <h6 className="mb-0" style={{ color: 'white' }}>
+                          <i className="fas fa-calendar-alt me-2" style={{ color: 'white' }}></i>
                           ข้อมูลการจอง
                         </h6>
                       </div>
@@ -2733,16 +3660,23 @@ function DashboardOwner() {
                         </div>
                         <div>
                           <small className="text-muted d-block">พนักงาน</small>
-                          <div className="fw-medium">{selectedBooking.employeeName ? selectedBooking.employeeName : (selectedBooking.employeeFullName ? selectedBooking.employeeFullName : 'ยังไม่กำหนด')}</div>
+                          <div className="fw-medium">
+                            {selectedBooking.employeeFullName || selectedBooking.employeeName || 'ยังไม่กำหนดพนักงาน'}
+                          </div>
+                          {selectedBooking.employeeId && (
+                            <small className="text-muted d-block">
+                              รหัสพนักงาน: {selectedBooking.employeeId.substring(0, 8)}...
+                            </small>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
                   <div className="col-md-6">
                     <div className="card h-100" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
-                        <h6 className="mb-0">
-                          <i className="fas fa-check-circle me-2" style={{ color: '#ff7730' }}></i>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
+                        <h6 className="mb-0" style={{ color: 'white' }}>
+                          <i className="fas fa-check-circle me-2" style={{ color: 'white' }}></i>
                           สถานะ
                         </h6>
                       </div>
@@ -2800,9 +3734,9 @@ function DashboardOwner() {
                 <div className="row mb-3">
                   <div className="col-12">
                     <div className="card" style={{ borderRadius: '10px', border: '1px solid #e9ecef' }}>
-                      <div className="card-header bg-light" style={{ borderRadius: '10px 10px 0 0' }}>
-                        <h6 className="mb-0">
-                          <i className="fas fa-history me-2" style={{ color: '#ff7730' }}></i>
+                      <div className="card-header" style={{ borderRadius: '10px 10px 0 0', background: '#5D4037' }}>
+                        <h6 className="mb-0" style={{ color: 'white' }}>
+                          <i className="fas fa-history me-2" style={{ color: 'white' }}></i>
                           ประวัติการดำเนินการ
                         </h6>
                       </div>
@@ -2813,13 +3747,13 @@ function DashboardOwner() {
                               width: '40px',
                               height: '40px',
                               borderRadius: '50%',
-                              background: 'rgba(255, 125, 41, 0.1)',
+                              background: '#5D4037',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               marginRight: '15px'
                             }}>
-                              <i className="fas fa-plus" style={{ color: '#ff7730' }}></i>
+                              <i className="fas fa-plus" style={{ color: 'white' }}></i>
                             </div>
                             <div>
                               <div className="fw-medium">สร้างการจอง</div>
@@ -2843,13 +3777,13 @@ function DashboardOwner() {
                                 width: '40px',
                                 height: '40px',
                                 borderRadius: '50%',
-                                background: 'rgba(40, 167, 69, 0.1)',
+                                background: '#5D4037',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 marginRight: '15px'
                               }}>
-                                <i className="fas fa-check" style={{ color: '#28a745' }}></i>
+                                <i className="fas fa-check" style={{ color: 'white' }}></i>
                               </div>
                               <div>
                                 <div className="fw-medium">อนุมัติการจอง</div>
@@ -2872,13 +3806,13 @@ function DashboardOwner() {
                                 width: '40px',
                                 height: '40px',
                                 borderRadius: '50%',
-                                background: 'rgba(220, 53, 69, 0.1)',
+                                background: '#5D4037',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 marginRight: '15px'
                               }}>
-                                <i className="fas fa-times" style={{ color: '#dc3545' }}></i>
+                                <i className="fas fa-times" style={{ color: 'white' }}></i>
                               </div>
                               <div>
                                 <div className="fw-medium">ปฏิเสธการจอง</div>
@@ -2901,13 +3835,13 @@ function DashboardOwner() {
                                 width: '40px',
                                 height: '40px',
                                 borderRadius: '50%',
-                                background: 'rgba(0, 123, 255, 0.1)',
+                                background: '#5D4037',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 marginRight: '15px'
                               }}>
-                                <i className="fas fa-money-bill-wave" style={{ color: '#0d6efd' }}></i>
+                                <i className="fas fa-money-bill-wave" style={{ color: 'white' }}></i>
                               </div>
                               <div>
                                 <div className="fw-medium">ชำระเงิน</div>
@@ -2948,7 +3882,8 @@ function DashboardOwner() {
                       {(selectedBooking.status === 'ยืนยันแล้ว' || selectedBooking.status === 'รอชำระเงิน') && 
                         selectedBooking.paymentStatus === 'รอชำระเงิน' && (
                         <button 
-                          className="btn btn-primary me-2" 
+                          className="btn btn-success me-2" 
+                          style={{ background: '#28a745', borderColor: '#28a745', color: '#fff', fontWeight: 'bold' }}
                           onClick={() => {
                             confirmPayment(selectedBooking.id);
                             setShowBookingDetails(false);

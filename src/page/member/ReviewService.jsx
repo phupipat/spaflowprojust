@@ -60,7 +60,7 @@ function ReviewService() {
         let bookingData = { id: bookingDoc.id, ...bookingDoc.data() };
         // ถ้ารีวิวแล้ว (canReview === false) และมี reviewsId ให้ดึงข้อมูลรีวิวจาก Reviews
         let reviewData = null;
-        if (bookingData.canReview === false && bookingData.reviewsId) {
+        if (bookingData.canReview === false && bookingData.reviewsId && bookingData.reviewsId !== "") {
           try {
             const reviewRef = doc(db, 'Reviews', bookingData.reviewsId);
             const reviewDoc = await getDoc(reviewRef);
@@ -148,8 +148,8 @@ function ReviewService() {
             if (employeeDoc && employeeDoc.exists()) {
               const employeeData = employeeDoc.data();
               console.log('Employee data fetched:', employeeData);
-              if (employeeData.role === 'employee' && employeeData.fullName) {
-                bookingData.employeeName = employeeData.fullName;
+              if (employeeData.role === 'employee' && (employeeData.fullName || employeeData.fullname)) {
+                bookingData.employeeName = employeeData.fullName || employeeData.fullname;
               } else {
                 bookingData.employeeName = employeeData.displayName || employeeData.name || 'ไม่ระบุ';
               }
@@ -364,6 +364,12 @@ function ReviewService() {
         comment: comment || '(ไม่มีความคิดเห็น)'
       });
 
+
+      // สร้าง ReviewID เป็น RV ตามด้วยเลขสุ่ม 6 หลัก และเวลาปัจจุบัน (ย้ายขึ้นก่อน)
+      const timestamp = new Date().getTime();
+      const randomNum = Math.floor(100000 + Math.random() * 900000);
+      const reviewId = `RV${randomNum}-${timestamp}`;
+
       // อัปเดตข้อมูลการจองหลังรีวิว: เก็บเฉพาะ canReview, reviewsId, reviewedAt
       try {
         const bookingRef = doc(db, 'Bookings', bookingId);
@@ -389,11 +395,6 @@ function ReviewService() {
         console.error('❌ เกิดข้อผิดพลาดในการอัพเดทข้อมูลการจอง:', bookingUpdateError);
         console.warn('⚠️ พบปัญหาในการอัพเดทข้อมูลการจอง แต่จะดำเนินการต่อ');
       }
-
-      // สร้าง ReviewID เป็น RV ตามด้วยเลขสุ่ม 6 หลัก และเวลาปัจจุบัน
-      const timestamp = new Date().getTime();
-      const randomNum = Math.floor(100000 + Math.random() * 900000);
-      const reviewId = `RV${randomNum}-${timestamp}`;
 
       // สร้างข้อมูลรีวิวที่สมบูรณ์
       // ดึงข้อมูลลูกค้าจาก /artifacts/login-spa-7921d/users
@@ -637,7 +638,7 @@ function ReviewService() {
   return (
     <div className="page-container">
       <div className="card shadow-sm">
-        <div className="card-header bg-primary text-white py-3">
+        <div className="card-header text-white py-3" style={{background: '#7B4019'}}>
           <div className="d-flex align-items-center">
             <button 
               type="button"
@@ -660,16 +661,17 @@ function ReviewService() {
                 <i className="fas fa-check-circle text-success" style={{ fontSize: '3rem' }}></i>
               </div>
               <h3 className="mb-3">ขอบคุณสำหรับรีวิวของคุณ</h3>
-              <div className="alert alert-success my-3">
+              <div className="alert my-3" style={{background: 'rgba(123, 64, 25, 0.1)', color: '#7B4019', border: '1px solid #7B4019'}}>
                 <p className="mb-1"><i className="fas fa-star me-2"></i> <strong>คะแนนที่ให้:</strong> {rating} ดาว</p>
                 {comment && <p className="mb-1"><i className="fas fa-comment me-2"></i> <strong>ความคิดเห็น:</strong> "{comment}"</p>}
                 <p className="mb-1"><i className="fas fa-check me-2"></i> <strong>สถานะ:</strong> บันทึกลงฐานข้อมูลเรียบร้อยแล้ว</p>
                 <p className="mb-0"><i className="fas fa-gift me-2"></i> <strong>รางวัล:</strong> คุณได้รับ 5 แต้มจากการรีวิว</p>
               </div>
               <div className="mt-4">
-                <button 
+                <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-brown px-5 py-3"
+                  style={{ fontSize: '1.2rem', fontWeight: 'bold' }}
                   onClick={() => {
                     console.log('SUCCESS_SCREEN home button clicked');
                     navigate('/member/DashboardMember');
@@ -788,9 +790,9 @@ function ReviewService() {
                     )}
                   </div>
 
-                  <button 
-                    type="button" 
-                    className="btn btn-primary btn-lg px-5 py-3 mb-2" 
+                  <button
+                    type="button"
+                    className="btn btn-brown px-5 py-3 mb-2"
                     style={{fontSize: '1.2rem', fontWeight: 'bold'}}
                     onClick={(e) => {
                       // Log event target and computed styles to detect overlays or CSS blocking

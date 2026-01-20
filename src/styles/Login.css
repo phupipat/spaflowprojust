@@ -1,0 +1,256 @@
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Login page container */
+.login-container {
+  background-color: #eee;
+  min-height: 100vh;
+}
+
+/* Card styling */
+.login-card {
+  max-width: 900px;
+  margin: 0 auto;
+  overflow: hidden;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.login-card-left {
+  background: linear-gradient(to right bottom, #ffffff, #f8f9fa);
+}
+
+/* Logo container */
+.logo-container {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.logo-circle {
+  background: linear-gradient(135deg, #ff7730 0%, #7B4019 100%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
+  box-shadow: 0 5px 15px rgba(123, 64, 25, 0.3);
+}
+
+.logo-text {
+  color: #7B4019;
+}
+
+/* Form styling */
+.login-form-container {
+  max-width: 400px;
+  width: 100%;
+}
+
+.login-form {
+  animation: fadeIn 0.8s ease-out;
+}
+
+.form-header {
+  color: #555;
+}
+
+/* Alert styling */
+.custom-alert {
+  border-radius: 12px;
+  border: none;
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
+
+/* Input group styling */
+.input-group-icon {
+  border-radius: 12px 0 0 12px;
+}
+
+.input-group-icon i {
+  color: #7B4019;
+}
+
+.custom-input {
+  box-sizing: border-box;
+  min-height: 48px;
+  border-color: #ced4da;
+  border-radius: 0 12px 12px 0;
+  box-shadow: none;
+  transition: all 0.3s ease;
+}
+
+/* Button styling */
+.login-button {
+  background: linear-gradient(135deg, #7B4019 0%, #ff7730 100%);
+  border: none !important;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 4px 10px rgba(123, 64, 25, 0.3);
+  transition: all 0.3s ease;
+  outline: none !important;
+}
+
+.login-button:hover {
+  box-shadow: 0 6px 12px rgba(123, 64, 25, 0.4);
+  transform: translateY(-2px);
+}
+
+.login-button:focus,
+.login-button:active,
+.login-button:active:focus {
+  box-shadow: 0 4px 10px rgba(123, 64, 25, 0.3) !important;
+  background: linear-gradient(135deg, #7B4019 0%, #ff7730 100%) !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.forgot-password {
+  text-decoration: none;
+  color: #7B4019;
+  font-weight: 500;
+}
+
+.forgot-password:hover {
+  color: #ff7730;
+  text-decoration: underline;
+}
+
+/* Register button */
+.register-btn {
+  border-radius: 50px;
+  padding: 8px 16px;
+  background: #fff;
+  color: #ff7730;
+  border: 2px solid #ff7730;
+  font-weight: 500;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.register-btn:hover {
+  background: #ff7730;
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(255, 119, 48, 0.3);
+}
+
+.register-btn:active {
+  background: #e66922;
+  color: white;
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(255, 119, 48, 0.3);
+}
+
+.register-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: 0.5s;
+  z-index: -1;
+}
+
+.register-btn:hover::before {
+  left: 100%;
+  animation: shine 1.5s infinite;
+}
+
+@keyframes shine {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.home-btn {
+  border-radius: 50px;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  color: #6c757d;
+  border: 1px solid #dee2e6;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.home-btn:hover {
+  background: #e9ecef;
+}
+
+/* Right side gradient area */
+.gradient-custom-2 {
+  background: linear-gradient(135deg, #7B4019 0%, #ff7730 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.gradient-custom-2:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" opacity="0.1"><path d="M0,1000 L1000,0 L1000,1000 Z" fill="%23ffffff"/></svg>');
+  background-size: cover;
+  opacity: 0.15;
+}
+
+/* Override Bootstrap's button primary */
+.btn-primary {
+  color: #fff !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary:active:focus {
+  box-shadow: none !important;
+}
+
+/* Feature icons */
+.feature-icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 15px;
+  flex-shrink: 0;
+}
+
+.feature-title {
+  animation: fadeIn 0.8s ease-out;
+  animation-delay: 0.3s;
+  animation-fill-mode: both;
+}
+
+.feature-list {
+  animation: fadeIn 0.8s ease-out;
+  animation-delay: 0.6s;
+  animation-fill-mode: both;
+}
+
+.large-icon {
+  width: 60px;
+  height: 60px;
+}
+
+.right-panel {
+  min-height: 500px;
+}

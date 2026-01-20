@@ -2,7 +2,7 @@
   import { db } from '../../Firebase';
   import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 
-// Custom CSS for the component
+// CSS กำหนดสไตล์สำหรับคอมโพเนนต์นี้
 const cardStyles = {
   promotionCard: {
     transition: 'transform 0.3s ease, box-shadow 0.3s ease',
@@ -13,12 +13,14 @@ const cardStyles = {
     boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
   },
   discountHeader: {
-    backgroundColor: '#e8f4ff',
-    borderBottom: '2px solid #c5e1ff'
+    background: 'linear-gradient(90deg, #b97b3e 0%, #7B4019 100%)',
+    borderBottom: '2px solid #7B4019',
+    color: '#fff'
   },
   freeServiceHeader: {
-    backgroundColor: '#f0fff0',
-    borderBottom: '2px solid #d0ebd0'
+    background: 'linear-gradient(90deg, #b97b3e 0%, #7B4019 100%)',
+    borderBottom: '2px solid #7B4019',
+    color: '#fff'
   },
   pointsBadge: {
     fontSize: '0.85rem',
@@ -27,11 +29,11 @@ const cardStyles = {
 };
 
 function PromotionAdd() {
-  // State สำหรับแก้ไขคูปอง
+  // สเตตสำหรับแก้ไขคูปอง
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({ name: '', description: '', pointsCost: 0, type: 'discount', value: '', validity: 30 });
 
-  // ฟังก์ชันเริ่มแก้ไขคูปอง
+  // ฟังก์ชันสำหรับเริ่มแก้ไขคูปอง
   const startEdit = (promotion) => {
     setEditId(promotion.id || promotion.uid);
     setEditData({
@@ -45,7 +47,7 @@ function PromotionAdd() {
     setShowAddForm(true);
   };
 
-  // ฟังก์ชันบันทึกการแก้ไขคูปอง
+  // ฟังก์ชันสำหรับบันทึกการแก้ไขคูปอง
   const handleEdit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -71,7 +73,7 @@ function PromotionAdd() {
     setLoading(false);
   };
 
-  // ฟังก์ชันลบคูปอง
+  // ฟังก์ชันสำหรับลบคูปอง
   const handleDelete = async (id) => {
     if (!window.confirm('ต้องการลบโปรโมชั่นนี้ใช่หรือไม่?')) return;
     setLoading(true);
@@ -128,7 +130,7 @@ function PromotionAdd() {
       setType('discount');
       setValue('');
       setValidity(30);
-      // Fetch updated promotions
+  // ดึงข้อมูลโปรโมชั่นล่าสุดหลังเพิ่ม
       fetchPromotions();
     } catch (err) {
       setError('เกิดข้อผิดพลาด');
@@ -136,6 +138,7 @@ function PromotionAdd() {
     setLoading(false);
   };
 
+  // ฟังก์ชันสำหรับดึงข้อมูลโปรโมชั่นทั้งหมด
   const fetchPromotions = async () => {
     setFetchLoading(true);
     try {
@@ -163,7 +166,7 @@ function PromotionAdd() {
         <button
           type="button"
           className="btn btn-lg btn-brown d-flex align-items-center px-4 py-2"
-          style={{ background: '#7c4d1e', color: '#fff', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+          style={{ borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
           onClick={() => setShowAddForm(!showAddForm)}
         >
           <i className={`fas ${showAddForm ? 'fa-minus' : 'fa-plus'} me-2`}></i> {showAddForm ? 'ปิดฟอร์มเพิ่มโปรโมชั่น' : 'เพิ่มโปรโมชั่นใหม่'}
@@ -200,7 +203,7 @@ function PromotionAdd() {
           </div>
           <div className="d-flex justify-content-end gap-2">
             {editId && <button type="button" className="btn btn-secondary" onClick={() => { setEditId(null); setEditData({ name: '', description: '', pointsCost: 0, type: 'discount', value: '', validity: 30 }); }}>ยกเลิก</button>}
-            <button type="submit" className={`btn ${editId ? 'btn-warning' : 'btn-primary'}`} disabled={loading}>
+            <button type="submit" className={`btn ${editId ? 'btn-warning' : 'btn-brown'}`} disabled={loading}>
               <i className={`fas ${editId ? 'fa-save' : 'fa-plus'} me-2`}></i>
               {loading ? 'กำลังบันทึก...' : editId ? 'บันทึกการแก้ไข' : 'เพิ่มโปรโมชั่น'}
             </button>
@@ -219,7 +222,8 @@ function PromotionAdd() {
             )}
           </div>
           <button 
-            className="btn btn-outline-primary" 
+            className="btn btn-outline-secondary" 
+            style={{ borderColor: '#7B4019', color: '#7B4019' }}
             onClick={fetchPromotions} 
             disabled={fetchLoading}
           >
@@ -233,21 +237,21 @@ function PromotionAdd() {
             <div className="btn-group" role="group" aria-label="Filter promotions">
               <button 
                 type="button" 
-                className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className={`btn ${filter === 'all' ? 'btn-brown' : 'btn-outline-secondary'}`}
                 onClick={() => setFilter('all')}
               >
                 ทั้งหมด
               </button>
               <button 
                 type="button" 
-                className={`btn ${filter === 'discount' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className={`btn ${filter === 'discount' ? 'btn-brown' : 'btn-outline-secondary'}`}
                 onClick={() => setFilter('discount')}
               >
                 <i className="fas fa-percent me-1"></i> ส่วนลด
               </button>
               <button 
                 type="button" 
-                className={`btn ${filter === 'freeService' ? 'btn-primary' : 'btn-outline-primary'}`}
+                className={`btn ${filter === 'freeService' ? 'btn-brown' : 'btn-outline-secondary'}`}
                 onClick={() => setFilter('freeService')}
               >
                 <i className="fas fa-gift me-1"></i> บริการฟรี

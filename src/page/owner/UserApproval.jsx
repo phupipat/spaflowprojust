@@ -5,6 +5,58 @@ import '../../../node_modules/bootstrap/dist/css/bootstrap.min.css';
 import '../../styles/SharedStyles.css';
 import '../../styles/DashboardStyles.css';
 
+// Add custom CSS for animations and new components
+const styles = `
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  
+  .icon-circle-sm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+  }
+  
+  .role-transition {
+    transition: all 0.3s ease;
+  }
+  
+  .animate__animated {
+    animation-duration: 1s;
+    animation-fill-mode: both;
+  }
+  
+  .animate__fadeIn {
+    animation-name: fadeIn;
+  }
+  
+  .animate__pulse {
+    animation-name: pulse;
+    animation-duration: 0.5s;
+    animation-iteration-count: 2;
+  }
+  
+  .dropdown-item:hover {
+    background-color: rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+  }
+  
+  /* Override default bootstrap table styling */
+  .table > :not(caption) > * > * {
+    padding: 1rem 1rem;
+  }
+`;
+
 function UserApproval() {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,9 +66,19 @@ function UserApproval() {
   const [filter, setFilter] = useState('all'); // 'all', 'member', 'employee'
   const [pendingCount, setPendingCount] = useState(0);
   const [openDropdowns, setOpenDropdowns] = useState({});
+  const [roleChanged, setRoleChanged] = useState(null); // Track which user's role was changed for animation
 
   useEffect(() => {
     fetchPendingUsers();
+    
+    // Inject custom styles
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = styles;
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      document.head.removeChild(styleElement);
+    };
   }, []);
 
   useEffect(() => {
@@ -42,6 +104,8 @@ function UserApproval() {
       
       setPendingUsers(pendingUsers);
       setPendingCount(pendingUsers.length);
+  // Debug: log roles to help investigate missing employee role display
+  console.debug('Fetched pending users roles:', pendingUsers.map(u => ({ id: u.id, role: u.role })));
     } catch (err) {
       console.error('Error fetching pending users:', err);
       alert('เกิดข้อผิดพลาดในการโหลดข้อมูล: ' + err.message);
@@ -70,7 +134,7 @@ function UserApproval() {
       if (user.email) {
         // สร้างเทมเพลตอีเมลที่เหมาะสมตามบทบาทของผู้ใช้
         const isEmployee = user.role === 'employee';
-        const loginLink = 'https://spa-flow.web.app/login'; // ลิงค์เข้าสู่ระบบ (ปรับตาม URL จริงของโปรเจค)
+        const loginLink = 'https://login-spa-7921d.web.app/login'; // ลิงค์เข้าสู่ระบบ (ปรับตาม URL จริงของโปรเจค)
 
         // สร้างหัวเรื่องอีเมลตามบทบาทของผู้ใช้
         const emailSubject = isEmployee 
@@ -81,24 +145,24 @@ function UserApproval() {
         const emailContent = isEmployee
           ? `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+              <div style="background: linear-gradient(135deg, #7B4019 0%, #FFB84C 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
                 <h1 style="margin: 0; font-size: 24px;">🎉 ยินดีต้อนรับสู่ทีมงาน SpaFlow!</h1>
               </div>
               <div style="padding: 30px; background: #f8f9fa; border-radius: 0 0 10px 10px;">
-                <h2 style="color: #333; margin-bottom: 20px;">สวัสดีคุณ ${user.fullname || user.name || 'พนักงานใหม่'},</h2>
-                <p style="color: #555; font-size: 16px;">เรามีความยินดีที่จะแจ้งให้ทราบว่า <strong>บัญชีพนักงาน</strong> ของคุณสำหรับ <strong>SpaFlow</strong> ได้รับการอนุมัติเรียบร้อยแล้ว!</p>
+                <h2 style="color: #7B4019; margin-bottom: 20px;">สวัสดีคุณ ${user.fullname || user.name || 'พนักงานใหม่'},</h2>
+                <p style="color: #7B4019; font-size: 16px;">เรามีความยินดีที่จะแจ้งให้ทราบว่า <strong>บัญชีพนักงาน</strong> ของคุณสำหรับ <strong>SpaFlow</strong> ได้รับการอนุมัติเรียบร้อยแล้ว!</p>
                 
-                <div style="background: #e8f0ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3a7bd5;">
-                  <p style="margin-top: 0; color: #333; font-weight: bold;">✓ คุณสามารถเข้าสู่ระบบได้แล้วตอนนี้</p>
-                  <p style="margin-bottom: 10px; color: #444;">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณได้ลงทะเบียนไว้:</p>
+                <div style="background: #FFF3E0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #7B4019;">
+                  <p style="margin-top: 0; color: #7B4019; font-weight: bold;">✓ คุณสามารถเข้าสู่ระบบได้แล้วตอนนี้</p>
+                  <p style="margin-bottom: 10px; color: #7B4019;">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณได้ลงทะเบียนไว้:</p>
                   <div style="text-align: center; margin: 15px 0;">
-                    <a href="${loginLink}" style="background-color: #3a7bd5; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">เข้าสู่ระบบตอนนี้</a>
+                    <a href="${loginLink}" style="background-color: #7B4019; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">เข้าสู่ระบบตอนนี้</a>
                   </div>
                 </div>
 
-                <div style="background: #f0f5fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                  <p style="margin: 0; color: #333; font-weight: bold;">⚡ ในระบบพนักงาน คุณสามารถ:</p>
-                  <ul style="color: #444; margin: 10px 0;">
+                <div style="background: #FFF8E1; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                  <p style="margin: 0; color: #7B4019; font-weight: bold;">⚡ ในระบบพนักงาน คุณสามารถ:</p>
+                  <ul style="color: #7B4019; margin: 10px 0;">
                     <li>ดูตารางงานประจำวันของคุณ</li>
                     <li>ตรวจสอบข้อมูลการจองที่ได้รับมอบหมาย</li>
                     <li>จัดการโปรไฟล์ส่วนตัว</li>
@@ -106,34 +170,34 @@ function UserApproval() {
                   </ul>
                 </div>
                 
-                <p style="color: #555;">หากคุณมีคำถามหรือต้องการความช่วยเหลือในการใช้งานระบบ โปรดติดต่อผู้จัดการของคุณได้โดยตรง</p>
-                <p style="color: #555; font-weight: bold;">เราดีใจที่ได้คุณมาร่วมเป็นส่วนหนึ่งของทีม และหวังว่าจะได้ร่วมงานกันอย่างราบรื่น!</p>
+                <p style="color: #7B4019;">หากคุณมีคำถามหรือต้องการความช่วยเหลือในการใช้งานระบบ โปรดติดต่อผู้จัดการของคุณได้โดยตรง</p>
+                <p style="color: #7B4019; font-weight: bold;">เราดีใจที่ได้คุณมาร่วมเป็นส่วนหนึ่งของทีม และหวังว่าจะได้ร่วมงานกันอย่างราบรื่น!</p>
                 
-                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
-                <p style="color: #777; font-size: 14px;">ขอแสดงความนับถือ,<br><strong>ทีมงาน SpaFlow</strong></p>
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #FFB84C;">
+                <p style="color: #7B4019; font-size: 14px;">ขอแสดงความนับถือ,<br><strong>ทีมงาน SpaFlow</strong></p>
               </div>
             </div>
           `
           : `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+              <div style="background: linear-gradient(135deg, #FFB84C 0%, #7B4019 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
                 <h1 style="margin: 0; font-size: 24px;">🎉 ยินดีต้อนรับสู่ SpaFlow!</h1>
               </div>
               <div style="padding: 30px; background: #f8f9fa; border-radius: 0 0 10px 10px;">
-                <h2 style="color: #333; margin-bottom: 20px;">สวัสดีคุณ ${user.fullname || user.name || 'สมาชิกใหม่'},</h2>
-                <p style="color: #555; font-size: 16px;">เรามีความยินดีที่จะแจ้งให้ทราบว่า <strong>บัญชีสมาชิก</strong> ของคุณสำหรับ <strong>SpaFlow</strong> ได้รับการอนุมัติเรียบร้อยแล้ว!</p>
+                <h2 style="color: #7B4019; margin-bottom: 20px;">สวัสดีคุณ ${user.fullname || user.name || 'สมาชิกใหม่'},</h2>
+                <p style="color: #7B4019; font-size: 16px;">เรามีความยินดีที่จะแจ้งให้ทราบว่า <strong>บัญชีสมาชิก</strong> ของคุณสำหรับ <strong>SpaFlow</strong> ได้รับการอนุมัติเรียบร้อยแล้ว!</p>
                 
-                <div style="background: #f7e8ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #764ba2;">
-                  <p style="margin-top: 0; color: #333; font-weight: bold;">✓ คุณสามารถเข้าสู่ระบบได้แล้วตอนนี้</p>
-                  <p style="margin-bottom: 10px; color: #444;">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณได้ลงทะเบียนไว้:</p>
+                <div style="background: #FFF3E0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FFB84C;">
+                  <p style="margin-top: 0; color: #7B4019; font-weight: bold;">✓ คุณสามารถเข้าสู่ระบบได้แล้วตอนนี้</p>
+                  <p style="margin-bottom: 10px; color: #7B4019;">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณได้ลงทะเบียนไว้:</p>
                   <div style="text-align: center; margin: 15px 0;">
-                    <a href="${loginLink}" style="background-color: #764ba2; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">เข้าสู่ระบบตอนนี้</a>
+                    <a href="${loginLink}" style="background-color: #7B4019; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">เข้าสู่ระบบตอนนี้</a>
                   </div>
                 </div>
 
-                <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                  <p style="margin: 0; color: #2d5a2d; font-weight: bold;">✅ ในฐานะสมาชิกของเรา คุณสามารถ:</p>
-                  <ul style="color: #2d5a2d; margin: 10px 0;">
+                <div style="background: #FFF8E1; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                  <p style="margin: 0; color: #7B4019; font-weight: bold;">✅ ในฐานะสมาชิกของเรา คุณสามารถ:</p>
+                  <ul style="color: #7B4019; margin: 10px 0;">
                     <li>จองบริการสปาออนไลน์ได้ทันที</li>
                     <li>รับสิทธิพิเศษและส่วนลดสำหรับสมาชิก</li>
                     <li>ดูประวัติการจองและสะสมแต้ม</li>
@@ -141,11 +205,11 @@ function UserApproval() {
                   </ul>
                 </div>
                 
-                <p style="color: #555;">ขอขอบคุณที่เลือกใช้บริการกับเรา เราหวังว่าคุณจะได้รับประสบการณ์ที่ดีที่สุดจากบริการสปาของเรา</p>
-                <p style="color: #555; font-style: italic;">พบกับโปรโมชั่นพิเศษสำหรับสมาชิกใหม่! จองบริการครั้งแรกรับส่วนลด 10% ภายใน 7 วัน</p>
+                <p style="color: #7B4019;">ขอขอบคุณที่เลือกใช้บริการกับเรา เราหวังว่าคุณจะได้รับประสบการณ์ที่ดีที่สุดจากบริการสปาของเรา</p>
+                <p style="color: #7B4019; font-style: italic;">พบกับโปรโมชั่นพิเศษสำหรับสมาชิกใหม่! จองบริการครั้งแรกรับส่วนลด 10% ภายใน 7 วัน</p>
                 
-                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
-                <p style="color: #777; font-size: 14px;">ขอแสดงความนับถือ,<br><strong>ทีมงาน SpaFlow</strong></p>
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #FFB84C;">
+                <p style="color: #7B4019; font-size: 14px;">ขอแสดงความนับถือ,<br><strong>ทีมงาน SpaFlow</strong></p>
               </div>
             </div>
           `;
@@ -271,7 +335,50 @@ function UserApproval() {
         )
       );
       
-      alert(`✅ เปลี่ยนบทบาทของ ${user.fullname || user.name} เป็น ${newRoleText} เรียบร้อยแล้ว`);
+      // Set the roleChanged state to trigger animation
+      setRoleChanged(userId);
+      setTimeout(() => setRoleChanged(null), 3000);
+      
+      // Show success toast notification instead of alert
+      const roleIcon = newRole === 'employee' ? 
+        '<i class="fas fa-user-tie" style="color: #0052cc;"></i>' : 
+        '<i class="fas fa-user text-success"></i>';
+        
+      const successElement = document.createElement('div');
+      successElement.innerHTML = `
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 5000">
+          <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header" style="background-color: ${newRole === 'employee' ? '#e6f0ff' : '#e8f5e8'}">
+              ${roleIcon}
+              <strong class="me-auto ms-2">เปลี่ยนบทบาทสำเร็จ</strong>
+              <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"
+                onClick="this.closest('.toast').remove()"></button>
+            </div>
+            <div class="toast-body">
+              <div class="d-flex align-items-center">
+                <div class="me-3">
+                  <span class="badge rounded-pill bg-${newRole === 'employee' ? 'primary' : 'success'}" style="font-size: 1.5rem; padding: 0.5rem;">
+                    <i class="fas fa-check"></i>
+                  </span>
+                </div>
+                <div>
+                  <p class="mb-0">เปลี่ยนบทบาทของ <strong>${user.fullname || user.name}</strong> เป็น <strong>${newRoleText}</strong> เรียบร้อยแล้ว</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(successElement);
+      
+      // Remove the toast after 3 seconds
+      setTimeout(() => {
+        if (successElement.parentNode) {
+          document.body.removeChild(successElement);
+        }
+      }, 3000);
+      
     } catch (err) {
       console.error('Error in handleChangeRole:', err);
       alert('❌ เกิดข้อผิดพลาดในการเปลี่ยนบทบาท: ' + err.message);
@@ -346,27 +453,41 @@ function UserApproval() {
           {/* Stats Card */}
           <div className="row g-3 mb-4">
             <div className="col-md-4">
-              <div className="card border-0 shadow-sm dashboard-card">
-                <div className="card-body d-flex align-items-center">
-                  <div className="icon-circle" style={{ backgroundColor: 'rgba(255, 153, 0, 0.1)' }}>
-                    <i className="fas fa-user-clock" style={{ color: '#ffffffff' }}></i>
+              <div className="card border-0 shadow-sm dashboard-card" style={{borderRadius: '10px', overflow: 'hidden'}}>
+                <div className="card-body d-flex align-items-center p-0">
+                  <div className="d-flex align-items-center justify-content-center h-100" 
+                    style={{ 
+                      backgroundColor: 'rgba(255, 153, 0, 0.1)', 
+                      width: '80px',
+                      padding: '20px'
+                    }}>
+                    <div className="icon-circle" style={{ backgroundColor: 'rgba(255, 153, 0, 0.2)', width: '50px', height: '50px' }}>
+                      <i className="fas fa-user-clock" style={{ color: '#ff9900', fontSize: '1.2rem' }}></i>
+                    </div>
                   </div>
-                  <div className="ms-3">
-                    <div className="text-muted small">ผู้ใช้รออนุมัติ</div>
-                    <div className="fs-4 fw-bold">{pendingUsers.length}</div>
+                  <div className="ms-3 p-3">
+                    <div className="text-muted small fw-medium">ผู้ใช้รออนุมัติ</div>
+                    <div className="fs-3 fw-bold">{pendingUsers.length}</div>
                   </div>
                 </div>
               </div>
             </div>
             <div className="col-md-4">
-              <div className="card border-0 shadow-sm dashboard-card">
-                <div className="card-body d-flex align-items-center">
-                  <div className="icon-circle" style={{ backgroundColor: 'rgba(40, 167, 69, 0.1)' }}>
-                    <i className="fas fa-user" style={{ color: '#ffffffff' }}></i>
+              <div className="card border-0 shadow-sm dashboard-card" style={{borderRadius: '10px', overflow: 'hidden'}}>
+                <div className="card-body d-flex align-items-center p-0">
+                  <div className="d-flex align-items-center justify-content-center h-100" 
+                    style={{ 
+                      backgroundColor: 'rgba(40, 167, 69, 0.1)', 
+                      width: '80px',
+                      padding: '20px'
+                    }}>
+                    <div className="icon-circle" style={{ backgroundColor: 'rgba(40, 167, 69, 0.2)', width: '50px', height: '50px' }}>
+                      <i className="fas fa-user" style={{ color: '#28a745', fontSize: '1.2rem' }}></i>
+                    </div>
                   </div>
-                  <div className="ms-3">
-                    <div className="text-muted small">ลูกค้ารออนุมัติ</div>
-                    <div className="fs-4 fw-bold">
+                  <div className="ms-3 p-3">
+                    <div className="text-muted small fw-medium">ลูกค้ารออนุมัติ</div>
+                    <div className="fs-3 fw-bold">
                       {pendingUsers.filter(u => u.role === 'member' || !u.role).length}
                     </div>
                   </div>
@@ -374,14 +495,21 @@ function UserApproval() {
               </div>
             </div>
             <div className="col-md-4">
-              <div className="card border-0 shadow-sm dashboard-card">
-                <div className="card-body d-flex align-items-center">
-                  <div className="icon-circle" style={{ backgroundColor: 'rgba(0, 123, 255, 0.1)' }}>
-                    <i className="fas fa-user-tie" style={{ color: '#f5f5f5ff' }}></i>
+              <div className="card border-0 shadow-sm dashboard-card" style={{borderRadius: '10px', overflow: 'hidden'}}>
+                <div className="card-body d-flex align-items-center p-0">
+                  <div className="d-flex align-items-center justify-content-center h-100" 
+                    style={{ 
+                      backgroundColor: 'rgba(0, 82, 204, 0.1)', 
+                      width: '80px',
+                      padding: '20px'
+                    }}>
+                    <div className="icon-circle" style={{ backgroundColor: 'rgba(0, 82, 204, 0.2)', width: '50px', height: '50px' }}>
+                      <i className="fas fa-user-tie" style={{ color: '#0052cc', fontSize: '1.2rem' }}></i>
+                    </div>
                   </div>
-                  <div className="ms-3">
-                    <div className="text-muted small">พนักงานรออนุมัติ</div>
-                    <div className="fs-4 fw-bold">
+                  <div className="ms-3 p-3">
+                    <div className="text-muted small fw-medium">พนักงานรออนุมัติ</div>
+                    <div className="fs-3 fw-bold">
                       {pendingUsers.filter(u => u.role === 'employee').length}
                     </div>
                   </div>
@@ -451,7 +579,10 @@ function UserApproval() {
                           อีเมล {getSortIcon('email')}
                         </th>
                         <th onClick={() => requestSort('role')} style={{cursor: 'pointer'}}>
-                          บทบาท {getSortIcon('role')}
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-user-tag me-1 text-muted" style={{fontSize: '0.9rem'}}></i>
+                            <span>บทบาท</span> {getSortIcon('role')}
+                          </div>
                         </th>
                         <th onClick={() => requestSort('timestamp')} style={{cursor: 'pointer'}}>
                           วันที่สมัคร {getSortIcon('timestamp')}
@@ -470,91 +601,181 @@ function UserApproval() {
                         <tr key={user.id}>
                           <td>
                             <div className="d-flex align-items-center">
-                              <div className="flex-shrink-0">
+                              <div className="flex-shrink-0 position-relative">
                                 <div 
-                                  className="icon-circle" 
+                                  className={`icon-circle role-transition ${roleChanged === user.id ? 'animate__animated animate__pulse' : ''}`}
                                   style={{ 
-                                    backgroundColor: user.role === 'employee' ? 'rgba(0, 123, 255, 0.1)' : 'rgba(40, 167, 69, 0.1)',
-                                    width: '45px',
-                                    height: '45px'
+                                    backgroundColor: user.role === 'employee' ? 'rgba(0, 82, 204, 0.15)' : 'rgba(40, 167, 69, 0.1)',
+                                    width: '50px',
+                                    height: '50px',
+                                    border: user.role === 'employee' ? '2px solid rgba(0, 82, 204, 0.3)' : '2px solid rgba(40, 167, 69, 0.2)'
                                   }}
                                 >
                                   <i 
                                     className={user.role === 'employee' ? 'fas fa-user-tie' : 'fas fa-user'} 
-                                    style={{ color: user.role === 'employee' ? '#0d6efd' : '#28a745' }}
+                                    style={{ 
+                                      color: user.role === 'employee' ? '#0052cc' : '#28a745',
+                                      fontSize: '1.2rem'
+                                    }}
                                   ></i>
+                                </div>
+                                {/* Role badge indicator */}
+                                <div 
+                                  className="position-absolute translate-middle badge rounded-pill" 
+                                  style={{ 
+                                    top: '75%', 
+                                    left: '75%', 
+                                    backgroundColor: user.role === 'employee' ? '#0052cc' : '#28a745',
+                                    border: '2px solid white',
+                                    padding: '0.35em 0.6em'
+                                  }}
+                                >
+                                  {user.role === 'employee' ? 
+                                    <i className="fas fa-briefcase" style={{fontSize: '0.7rem'}}></i> : 
+                                    <i className="fas fa-id-card" style={{fontSize: '0.7rem'}}></i>}
                                 </div>
                               </div>
                               <div className="ms-3">
-                                <h6 className="mb-0">{user.fullname || user.name}</h6>
-                                <small className="text-muted">สมัครเมื่อ {user.timestamp ? new Date(user.timestamp.seconds * 1000).toLocaleDateString('th-TH') : 'ไม่ระบุ'}</small>
+                                <div className="d-flex align-items-center">
+                                  <h6 className="mb-0 fw-bold">{user.fullname || user.name}</h6>
+                                  {roleChanged === user.id && (
+                                    <span className="badge bg-warning ms-2 animate__animated animate__fadeIn">
+                                      บทบาทถูกเปลี่ยน
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="d-flex align-items-center mt-1">
+                                  <i className="fas fa-clock text-muted me-1" style={{fontSize: '0.7rem'}}></i>
+                                  <small className="text-muted">
+                                    สมัครเมื่อ {user.timestamp ? 
+                                      new Date(user.timestamp.seconds * 1000).toLocaleDateString('th-TH', {day: 'numeric', month: 'short', year: 'numeric'}) : 
+                                      'ไม่ระบุ'}
+                                  </small>
+                                </div>
                               </div>
                             </div>
                           </td>
-                          <td>{user.email}</td>
                           <td>
-                            <div className="dropdown" style={{ position: 'relative' }}>
+                            <div className="d-flex align-items-center">
+                              <i className="fas fa-envelope-open text-muted me-2" style={{fontSize: '0.8rem'}}></i>
+                              <span className="text-truncate" style={{maxWidth: '200px', display: 'inline-block'}} title={user.email}>
+                                {user.email}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="d-flex align-items-center">
+                              {/* Persistent role badge for visibility/debugging */}
+                              <span className={`badge me-2 ${user.role === 'employee' ? 'bg-primary' : user.role === 'member' ? 'bg-success' : 'bg-secondary'}`} style={{textTransform: 'none'}}>
+                                {user.role || 'ไม่ระบุ'}
+                              </span>
+                              <div className="dropdown" style={{ position: 'relative' }}>
                               <button 
-                                className={`btn btn-sm ${user.role === 'employee' ? 'btn-primary' : 'btn-success'}`}
+                                className={`btn btn-sm d-flex align-items-center justify-content-between`}
                                 type="button" 
                                 onClick={() => toggleDropdown(user.id)}
                                 disabled={updating[user.id]}
-                                style={{ minWidth: '120px' }}
+                                style={{ 
+                                  minWidth: '140px',
+                                  padding: '6px 12px',
+                                  backgroundColor: user.role === 'employee' ? '#0052cc' : (user.role === 'member' ? '#28a745' : '#e0e0e0'),
+                                  color: user.role === 'employee' ? '#fff' : (user.role === 'member' ? '#fff' : '#333'),
+                                  borderColor: user.role === 'employee' ? '#004099' : (user.role === 'member' ? '#218838' : '#ccc'),
+                                  fontWeight: user.role === 'employee' ? 600 : 500,
+                                  boxShadow: updating[user.id] ? 'none' : '0 1px 3px rgba(0,0,0,0.12)'
+                                }}
                               >
-                                {user.role === 'member' ? (
-                                  <>
-                                    <i className="fas fa-user me-1"></i>
-                                    ลูกค้า
-                                  </>
-                                ) : user.role === 'employee' ? (
-                                  <>
-                                    <i className="fas fa-user-tie me-1"></i>
-                                    พนักงาน
-                                  </>
-                                ) : (
-                                  <>
-                                    <i className="fas fa-question me-1"></i>
-                                    ไม่ระบุ
-                                  </>
-                                )}
-                                <i className="fas fa-chevron-down ms-1"></i>
+                                <span className="d-flex align-items-center">
+                                  {user.role === 'member' ? (
+                                    <>
+                                      <i className="fas fa-user me-2" style={{fontSize: '0.9rem'}}></i>
+                                      <span>ลูกค้า</span>
+                                    </>
+                                  ) : user.role === 'employee' ? (
+                                    <>
+                                      <i className="fas fa-user-tie me-2" style={{fontSize: '0.9rem'}}></i>
+                                      <span>พนักงาน</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <i className="fas fa-question-circle me-2" style={{fontSize: '0.9rem'}}></i>
+                                      <span>ไม่ระบุ</span>
+                                    </>
+                                  )}
+                                </span>
+                                <i className="fas fa-chevron-down ms-1" style={{fontSize: '0.8rem'}}></i>
                               </button>
                               {openDropdowns[user.id] && (
                                 <div 
-                                  className="dropdown-menu show" 
+                                  className="dropdown-menu show shadow-sm" 
                                   style={{ 
                                     position: 'absolute', 
                                     top: '100%', 
                                     left: '0',
                                     zIndex: 1000,
-                                    minWidth: '200px'
+                                    minWidth: '220px',
+                                    padding: '8px',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(0,0,0,0.08)',
+                                    animation: 'fadeIn 0.2s ease-in-out'
                                   }}
                                 >
                                   <button 
-                                    className="dropdown-item" 
+                                    className={`dropdown-item rounded-3 mb-1 ${user.role === 'member' ? 'active' : ''}`}
                                     onClick={() => {
                                       handleChangeRole(user.id, 'member');
                                       setOpenDropdowns(prev => ({ ...prev, [user.id]: false }));
                                     }}
                                     disabled={user.role === 'member' || updating[user.id]}
+                                    style={user.role === 'member' ? 
+                                      {backgroundColor: '#e8f5e8', padding: '10px 15px'} : 
+                                      {padding: '10px 15px'}
+                                    }
                                   >
-                                    <i className="fas fa-user me-2 text-success"></i>
-                                    เปลี่ยนเป็นลูกค้า
+                                    <div className="d-flex align-items-center justify-content-between">
+                                      <div className="d-flex align-items-center">
+                                        <div className="icon-circle-sm me-2" style={{backgroundColor: 'rgba(40, 167, 69, 0.15)'}}>
+                                          <i className="fas fa-user text-success" style={{fontSize: '0.8rem'}}></i>
+                                        </div>
+                                        <span style={{fontWeight: user.role === 'member' ? '600' : '400'}}>เปลี่ยนเป็นลูกค้า</span>
+                                      </div>
+                                      {user.role === 'member' && 
+                                        <span className="badge bg-success rounded-pill" style={{fontSize: '0.7rem', padding: '0.35em 0.65em'}}>
+                                          <i className="fas fa-check"></i>
+                                        </span>
+                                      }
+                                    </div>
                                   </button>
                                   <button 
-                                    className="dropdown-item" 
+                                    className={`dropdown-item rounded-3 ${user.role === 'employee' ? 'active' : ''}`} 
                                     onClick={() => {
                                       handleChangeRole(user.id, 'employee');
                                       setOpenDropdowns(prev => ({ ...prev, [user.id]: false }));
                                     }}
                                     disabled={user.role === 'employee' || updating[user.id]}
+                                    style={user.role === 'employee' ? 
+                                      {backgroundColor: '#e6f0ff', color: '#0052cc', fontWeight: 600, padding: '10px 15px'} : 
+                                      {padding: '10px 15px'}
+                                    }
                                   >
-                                    <i className="fas fa-user-tie me-2 text-primary"></i>
-                                    เปลี่ยนเป็นพนักงาน
+                                    <div className="d-flex align-items-center justify-content-between">
+                                      <div className="d-flex align-items-center">
+                                        <div className="icon-circle-sm me-2" style={{backgroundColor: 'rgba(6, 73, 174, 0.15)'}}>
+                                          <i className="fas fa-user-tie" style={{color: '#0052cc', fontSize: '0.8rem'}}></i>
+                                        </div>
+                                        <span style={{fontWeight: user.role === 'employee' ? '600' : '400'}}>เปลี่ยนเป็นพนักงาน</span>
+                                      </div>
+                                      {user.role === 'employee' && 
+                                        <span className="badge rounded-pill" style={{backgroundColor: '#0052cc', fontSize: '0.7rem', padding: '0.35em 0.65em'}}>
+                                          <i className="fas fa-check"></i>
+                                        </span>
+                                      }
+                                    </div>
                                   </button>
                                 </div>
                               )}
                             </div>
+                          </div>
                           </td>
                           <td>
                             {user.timestamp ? 
@@ -591,13 +812,7 @@ function UserApproval() {
                               >
                                 <i className="fas fa-times me-1"></i> ปฏิเสธ
                               </button>
-                              <button 
-                                className="btn btn-sm btn-outline-dark"
-                                onClick={() => window.open(`/profile/${user.id}`, '_blank')}
-                                disabled={updating[user.id]}
-                              >
-                                <i className="fas fa-id-card me-1"></i> โปรไฟล์
-                              </button>
+                              
                             </div>
                           </td>
                         </tr>

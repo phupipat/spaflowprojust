@@ -1,3 +1,87 @@
+/* Member Dashboard: Primary/Action/Submit Button Styles */
+/* Brown spa style for review submit button */
+.primary-btn, .action-btn.primary-btn, .custom-btn-primary {
+  background: linear-gradient(135deg, #ff9900 0%,  #ff7730  100%);
+  border: 2px solid #7c4a1e;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 0.5rem 1.2rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(243, 208, 178, 0.1);
+}
+.primary-btn:hover, .action-btn.primary-btn:hover, .custom-btn-primary:hover {
+  background: linear-gradient(135deg, #ff7730 0%,  #ff9900 100%);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(235, 181, 135, 0.18);
+}
+/* Filter Button Styles with distinct colors and animations */
+.filter-btn-all {
+  background: linear-gradient(135deg, #7c4a1e 0%, #a9744f 100%) !important;
+  border: 2px solid #7c4a1e !important;
+  color: #fff !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transform: scale(1) !important;
+}
+.filter-btn-all:hover {
+  background: linear-gradient(135deg, #8d562a 0%, #ba855f 100%) !important;
+  box-shadow: 0 4px 15px rgba(124, 74, 30, 0.35) !important;
+  transform: translateY(-2px) !important;
+}
+.filter-btn-all:active {
+  transform: scale(0.95) translateY(1px) !important;
+  box-shadow: 0 2px 8px rgba(124, 74, 30, 0.25) !important;
+}
+.filter-btn-all.active {
+  background: linear-gradient(135deg, #8d562a 0%, #ba855f 100%) !important;
+  box-shadow: 0 4px 12px rgba(124, 74, 30, 0.25) !important;
+  border-width: 3px !important;
+}
+
+.filter-btn-ongoing {
+  background: linear-gradient(135deg, #ff7730 0%, #ff9248 100%) !important;
+  border: 2px solid #ff7730 !important;
+  color: #fff !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transform: scale(1) !important;
+}
+.filter-btn-ongoing:hover {
+  background: linear-gradient(135deg, #ff8544 0%, #ffa15c 100%) !important;
+  box-shadow: 0 4px 15px rgba(255, 119, 48, 0.35) !important;
+  transform: translateY(-2px) !important;
+}
+.filter-btn-ongoing:active {
+  transform: scale(0.95) translateY(1px) !important;
+  box-shadow: 0 2px 8px rgba(255, 119, 48, 0.25) !important;
+}
+.filter-btn-ongoing.active {
+  background: linear-gradient(135deg, #ff8544 0%, #ffa15c 100%) !important;
+  box-shadow: 0 4px 12px rgba(255, 119, 48, 0.25) !important;
+  border-width: 3px !important;
+}
+
+.filter-btn-completed {
+  background: linear-gradient(135deg, #28a745 0%, #34ce57 100%) !important;
+  border: 2px solid #28a745 !important;
+  color: #fff !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transform: scale(1) !important;
+}
+.filter-btn-completed:hover {
+  background: linear-gradient(135deg, #2fc751 0%, #3fe063 100%) !important;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.35) !important;
+  transform: translateY(-2px) !important;
+}
+.filter-btn-completed:active {
+  transform: scale(0.95) translateY(1px) !important;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.25) !important;
+}
+.filter-btn-completed.active {
+  background: linear-gradient(135deg, #2fc751 0%, #3fe063 100%) !important;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.25) !important;
+  border-width: 3px !important;
+}
 /* Owner Dashboard specific styles */
 
 .sidebar-wrapper {

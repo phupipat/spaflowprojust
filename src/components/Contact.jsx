@@ -130,7 +130,7 @@ function Contact() {
                        borderRadius: '50px',
                        boxShadow: '0 5px 15px rgba(255, 153, 0, 0.3)'
                      }}>
-                    <i className="fas fa-paper-plane me-2"></i> ส่งข้อความหาเรา
+                    <i className="fas fa-paper-plane me-2" style={{ color: '#ffffffff' }}></i> ส่งข้อความหาเรา
                   </a>
                 </div>
               </div>
@@ -239,7 +239,7 @@ function Contact() {
                     <div className="icon-circle mb-3 mx-auto" style={{ 
                       width: '80px', 
                       height: '80px', 
-                      background: 'linear-gradient(45deg, #7B4019, #FF7D29)', 
+                      background: 'linear-gradient(45deg, #FF7D29, #FFBF78)', 
                       borderRadius: '50%', 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -291,7 +291,7 @@ function Contact() {
                   }}>
                     <i className="fas fa-envelope-open-text text-white"></i>
                   </div>
-                  <h3 className="fw-bold mb-0" style={{ color: '#333' }}>ส่งข้อความหาเรา</h3>
+                  <h3 className="fw-bold mb-0" style={{ color: '#fff' }}>ส่งข้อความหาเรา</h3>
                 </div>
                 <p className="text-muted mb-4">เราจะติดต่อกลับหาคุณโดยเร็วที่สุด</p>
                 
@@ -393,7 +393,7 @@ function Contact() {
                 สัมผัสประสบการณ์ความผ่อนคลายที่เหนือระดับ 
                 ที่ออกแบบมาเพื่อการฟื้นฟูร่างกายและจิตใจของคุณโดยเฉพาะ
               </p>
-              <div className="d-flex gap-3">https://www.instagram.com/theretreatbkk
+              <div className="d-flex gap-3">
                 <a href="https://www.facebook.com/profile.php?id=61557876865512" target="_blank" rel="noopener noreferrer" className="social-icon">
                   <i className="fab fa-facebook-f" style={{ color: '#1877f3' }}></i>
                 </a>

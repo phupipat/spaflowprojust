@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../Firebase';
-import { collection, query, where, getDocs, getDoc, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, addDoc, increment } from 'firebase/firestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { FaStar, FaGift, FaArrowLeft, FaTicketAlt, FaClock } from 'react-icons/fa';
 import '../../styles/SharedStyles.css';
@@ -32,8 +32,26 @@ function MemberRewards() {
         const userRef = doc(db, 'artifacts/login-spa-7921d/users', user.uid);
         const userDoc = await getDoc(userRef);
         const userData = userDoc.exists() ? userDoc.data() : null;
-        setPoints(userData?.points || 0);
         setUserName(userData?.fullname || userData?.name || user.email.split('@')[0]);
+
+        // คำนวณแต้มจาก PointHistory เหมือนกับ DashboardMember
+        const phQuery = query(collection(db, 'PointHistory'), where('userId', '==', user.uid));
+        const phSnap = await getDocs(phQuery);
+        const phList = phSnap.docs.map(doc => doc.data());
+        
+        // รวมแต้มสะสมจริงจาก PointHistory (แต้มที่ได้รับ - แต้มที่ใช้)
+        const totalPoints = phList.reduce((sum, h) => {
+          // ประเภท transaction ที่เป็นการเพิ่มแต้ม
+          const isEarn = h.type === 'EARN' || h.type === 'earned' || h.type === 'add' || h.type === 'ADD' || h.type === 'REVIEW' || h.type === 'เพิ่มแต้ม';
+          // ประเภท transaction ที่เป็นการใช้/แลกแต้ม
+          const isUse = h.type === 'USE' || h.type === 'subtract' || h.type === 'SUBTRACT' || h.type === 'redeem' || h.type === 'แลกแต้ม';
+          // ใช้ฟิลด์ `points` เท่านั้น
+          const value = Number(h.points) || 0;
+          if (isEarn) return sum + value;
+          if (isUse) return sum - value;
+          return sum;
+        }, 0);
+        setPoints(totalPoints);
 
         // ดึงรายการโปรโมชั่นจาก Rewards
         const rewardsSnapshot = await getDocs(collection(db, 'Rewards'));
@@ -46,7 +64,8 @@ function MemberRewards() {
             pointsCost: data.pointsCost,
             type: data.type,
             value: data.value,
-            validity: data.validity,
+            validity: data.validity, // จำนวนเดือนที่มีอายุใช้งาน (เช่น 1 = 1 เดือน, 3 = 3 เดือน)
+            validityText: data.validity ? `มีอายุใช้งาน ${data.validity} เดือน` : 'ไม่มีวันหมดอายุ',
             icon: data.type === 'discount'
               ? <FaTicketAlt size={24} className="reward-icon" />
               : <FaGift size={24} className="reward-icon" />
@@ -96,6 +115,29 @@ function MemberRewards() {
     setRedemptionError("");
   };
 
+  // เพิ่มฟังก์ชันสำหรับบันทึกแต้มหลังรีวิว
+  const addReviewPoints = async () => {
+    if (!user) return;
+    try {
+      // เพิ่มแต้ม 5 คะแนนให้ user
+      const userRef = doc(db, 'artifacts/login-spa-7921d/users', user.uid);
+      await updateDoc(userRef, {
+        points: increment(5)
+      });
+      // เพิ่มประวัติแต้ม
+      await addDoc(collection(db, 'PointHistory'), {
+        userId: user.uid,
+        points: 5,
+        type: 'REVIEW',
+        reason: 'ได้รับแต้มจากการรีวิวบริการ',
+        createdAt: new Date()
+      });
+      setPoints(prev => prev + 5);
+    } catch (error) {
+      console.error('Error adding review points:', error);
+    }
+  };
+
   const handleRedeemReward = async () => {
     if (!selectedReward) return;
 
@@ -111,13 +153,19 @@ function MemberRewards() {
       // 1. ลดคะแนนสะสมใน /artifacts/login-spa-7921d/users
       const userRef = doc(db, 'artifacts/login-spa-7921d/users', user.uid);
       await updateDoc(userRef, {
-        points: points - selectedReward.pointsCost
+        points: increment(-selectedReward.pointsCost)
       });
 
       // 2. บันทึกการแลกรางวัลใน Redemptions
-      // กำหนดวันหมดอายุให้ห่างออกไปมาก ๆ (เสมือนไม่มีวันหมดอายุ)
+      // คำนวณวันหมดอายุตาม validity ที่กำหนด (จำนวนเดือน)
       const validUntil = new Date();
-      validUntil.setFullYear(validUntil.getFullYear() + 100); // เพิ่มไป 100 ปี
+      if (selectedReward.validity && typeof selectedReward.validity === 'number') {
+        // ถ้ามีการกำหนด validity เป็นจำนวนเดือน
+        validUntil.setMonth(validUntil.getMonth() + selectedReward.validity);
+      } else {
+        // กรณีไม่กำหนด validity กำหนดเป็น 100 ปี (ไม่มีวันหมดอายุ)
+        validUntil.setFullYear(validUntil.getFullYear() + 100);
+      }
 
       const redemptionData = {
         userId: user.uid,
@@ -133,12 +181,13 @@ function MemberRewards() {
       };
       const redemptionRef = await addDoc(collection(db, 'Redemptions'), redemptionData);
 
-      // 3. เพิ่มประวัติการใช้แต้มใน pointHistory
-      await addDoc(collection(db, 'pointHistory'), {
+      // 3. เพิ่มประวัติการใช้แต้มใน PointHistory
+      await addDoc(collection(db, 'PointHistory'), {
         userId: user.uid,
-        amount: -selectedReward.pointsCost,
-        type: 'redeem',
-        timestamp: new Date(),
+        points: selectedReward.pointsCost,
+        type: 'USE',
+        reason: `แลกรางวัล: ${selectedReward.name}`,
+        createdAt: new Date(),
         rewardId: selectedReward.id
       });
 
@@ -163,18 +212,30 @@ function MemberRewards() {
     setRedeemLoading(false);
   };
 
+
+  // ฟังก์ชันแปลงวันที่ (timestamp/Date/Firestore) เป็น string ไทย
   const formatDate = (date) => {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('th-TH', {
+    let d = date;
+    if (typeof d?.toDate === 'function') d = d.toDate();
+    else if (typeof d === 'string' || typeof d === 'number') d = new Date(d);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('th-TH', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
   };
 
-  const daysRemaining = (validUntil) => {
-    // ไม่ตรวจสอบวันหมดอายุ
-    return validUntil ? 999999 : 0; // ส่งค่าจำนวนวันที่มาก ๆ เพื่อให้ไม่มีวันหมดอายุ
+  // ฟังก์ชันคำนวณสถานะรางวัล
+  const getRedemptionStatus = (redemption) => {
+    const now = new Date();
+    let validUntil = redemption.validUntil;
+    if (typeof validUntil?.toDate === 'function') validUntil = validUntil.toDate();
+    else if (typeof validUntil === 'string' || typeof validUntil === 'number') validUntil = new Date(validUntil);
+    if (redemption.used) return { label: 'ใช้งานแล้ว', color: 'secondary' };
+    if (validUntil && now > validUntil) return { label: 'หมดอายุ', color: 'danger' };
+    return { label: 'ใช้งานได้', color: 'success' };
   };
 
   if (loading) {
@@ -283,11 +344,21 @@ function MemberRewards() {
                     }}>{reward.name}</h5>
                   </div>
                   
-                  <p className="card-text mb-4" style={{ 
+                  <p className="card-text mb-2" style={{ 
                     color: '#666',
                     fontSize: '0.9rem',
                     minHeight: '60px'
                   }}>{reward.description}</p>
+                  
+                  <div className="validity-info mb-3" style={{
+                    background: 'rgba(52, 152, 219, 0.1)', 
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontSize: '0.85rem'
+                  }}>
+                    <FaClock style={{ color: '#3498db', marginRight: '8px' }} />
+                    <span style={{ color: '#2980b9' }}>{reward.validityText}</span>
+                  </div>
                   
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <div className="reward-points d-flex align-items-center" style={{
@@ -332,7 +403,7 @@ function MemberRewards() {
                     }}
                     disabled={points < reward.pointsCost}
                     style={{
-                      background: points >= reward.pointsCost ? 'linear-gradient(135deg, #3498db, #2980b9)' : '#f1f4f6',
+                      background: points >= reward.pointsCost ? 'linear-gradient(135deg, #7B4019)' : '#f1f4f6',
                       color: points >= reward.pointsCost ? 'white' : '#999',
                       border: 'none',
                       padding: '12px',
@@ -388,27 +459,32 @@ function MemberRewards() {
                 </tr>
               </thead>
               <tbody>
-                {userRedemptions.map(redemption => (
-                  <tr key={redemption.id}>
-                    <td>{redemption.rewardName}</td>
-                    <td>{redemption.pointsUsed} แต้ม</td>
-                    <td>{formatDate(redemption.redeemedAt)}</td>
-                    <td>{formatDate(redemption.validUntil)}</td>
-                    <td>
-                      {redemption.used ? (
-                        <span className="badge bg-secondary">ใช้งานแล้ว</span>
-                      ) : (
-                        <div>
-                          <span className="badge bg-success">ใช้งานได้</span>
+                {userRedemptions.map(redemption => {
+                  const status = getRedemptionStatus(redemption);
+                  return (
+                    <tr key={redemption.id}>
+                      <td>{redemption.rewardName}</td>
+                      <td>{redemption.pointsUsed} แต้ม</td>
+                      <td>{formatDate(redemption.redeemedAt)}</td>
+                      <td>{formatDate(redemption.validUntil)}</td>
+                      <td>
+                        <span className={`badge bg-${status.color}`}>{status.label}</span>
+                        {status.label === 'ใช้งานได้' && (
                           <small className="d-block text-muted mt-1">
                             <FaClock className="me-1" size={12} />
-                            ไม่มีวันหมดอายุ
+                            {redemption.validUntil ? `หมดอายุ: ${formatDate(redemption.validUntil)}` : 'ไม่มีวันหมดอายุ'}
                           </small>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        )}
+                        {status.label === 'หมดอายุ' && (
+                          <small className="d-block text-danger mt-1">
+                            <FaClock className="me-1" size={12} />
+                            หมดอายุแล้ว
+                          </small>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -418,24 +494,25 @@ function MemberRewards() {
       {/* โมดัลยืนยันการแลกรางวัล */}
       {showConfirmModal && selectedReward && (
         <div className="modal-backdrop" style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1050
-      }}>
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content" style={{
-            borderRadius: '20px',
-            border: 'none',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
-          }}>
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1050
+        }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content" style={{
+              borderRadius: '20px',
+              border: 'none',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+              overflow: 'hidden',
+              background: '#fff' // สีขาวทึบ
+            }}>
             {redemptionSuccess ? (
                 <div className="modal-body text-center p-5">
                   <div className="success-icon mb-4" style={{
@@ -472,7 +549,7 @@ function MemberRewards() {
               ) : (
                 <>
                   <div className="modal-header" style={{
-                    background: 'linear-gradient(135deg, #3498db, #2980b9)',
+                    background: 'linear-gradient(135deg,  #FF7D29, #7B4019)',
                     border: 'none',
                     padding: '20px'
                   }}>
@@ -508,6 +585,10 @@ function MemberRewards() {
                           <p className="text-muted mb-0" style={{ fontSize: '0.9rem' }}>
                             {selectedReward.description}
                           </p>
+                          <div className="mt-2" style={{ fontSize: '0.85rem', color: '#3498db' }}>
+                            <FaClock style={{ marginRight: '5px' }} />
+                            {selectedReward.validityText}
+                          </div>
                         </div>
                       </div>
                       <div className="d-flex align-items-center" style={{
@@ -584,7 +665,7 @@ function MemberRewards() {
                       onClick={handleRedeemReward}
                       disabled={redeemLoading || points < selectedReward.pointsCost}
                       style={{
-                        background: 'linear-gradient(135deg, #3498db, #2980b9)',
+                        background: 'linear-gradient(135deg, #7B4019)',
                         color: 'white',
                         border: 'none',
                         borderRadius: '12px',

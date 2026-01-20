@@ -28,7 +28,7 @@ function OwnerSettings() {
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    // Fetch settings data
+  // ดึงข้อมูลการตั้งค่าระบบ
     const fetchSettings = async () => {
       try {
         setIsLoading(true);
@@ -142,7 +142,7 @@ function OwnerSettings() {
               
               <form onSubmit={saveSettings}>
                 <div className="row">
-                  {/* ข้อมูลธุรกิจ */}
+                  {/* ส่วนข้อมูลธุรกิจ */}
                   <div className="col-12 mb-4">
                     <h5 className="fw-bold mb-3">
                       <i className="fas fa-store me-2" style={{ color: '#ff9900' }}></i>
@@ -201,7 +201,7 @@ function OwnerSettings() {
                     </div>
                   </div>
                   
-                  {/* เวลาทำการ */}
+                  {/* ส่วนเวลาทำการ */}
                   <div className="col-12 mb-4">
                     <h5 className="fw-bold mb-3">
                       <i className="fas fa-clock me-2" style={{ color: '#ff9900' }}></i>
@@ -234,7 +234,7 @@ function OwnerSettings() {
                     </div>
                   </div>
                   
-                  {/* การจอง */}
+                  {/* ส่วนการจอง */}
                   <div className="col-12 mb-4">
                     <h5 className="fw-bold mb-3">
                       <i className="fas fa-calendar-check me-2" style={{ color: '#ff9900' }}></i>
@@ -303,7 +303,7 @@ function OwnerSettings() {
                     </div>
                   </div>
                   
-                  {/* การแจ้งเตือน */}
+                  {/* ส่วนการแจ้งเตือน */}
                   <div className="col-12 mb-4">
                     <h5 className="fw-bold mb-3">
                       <i className="fas fa-bell me-2" style={{ color: '#ff9900' }}></i>
@@ -346,7 +346,7 @@ function OwnerSettings() {
                     </div>
                   </div>
                   
-                  {/* การบำรุงรักษาระบบ */}
+                  {/* ส่วนการบำรุงรักษาระบบ */}
                   <div className="col-12 mb-4">
                     <h5 className="fw-bold mb-3">
                       <i className="fas fa-tools me-2" style={{ color: '#ff9900' }}></i>

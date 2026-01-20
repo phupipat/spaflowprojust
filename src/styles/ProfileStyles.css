@@ -1,0 +1,221 @@
+/* Profile Styles - Shared between Member and Employee */
+/* Color Palette เข้ากับ Dashboard: สีนุ่ม ไม่เด่นเกินไป */
+
+.profile-container {
+  min-height: 100vh;
+  background: #faf8f0; /* เหมือน Dashboard */
+  padding: 2rem 1rem;
+}
+
+.profile-header-card {
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 5px 20px rgba(44, 44, 44, 0.08);
+  background: linear-gradient(135deg, #f5f3f0 0%, #ebe8e3 50%, #e8e5e0 100%);
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #653312 0%, #583015 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  box-shadow: 0 4px 15px rgba(101, 51, 18, 0.25);
+}
+
+.profile-avatar i {
+  font-size: 2rem;
+  color: #fff;
+}
+
+.profile-title {
+  color: #2c2c2c;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.profile-subtitle {
+  color: #6c757d;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.profile-form-card {
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 5px 20px rgba(44, 44, 44, 0.08);
+  background: #ffffff;
+}
+
+.profile-loading {
+  text-align: center;
+  padding: 3rem 0;
+}
+
+.profile-loading .spinner-border {
+  margin-bottom: 1rem;
+}
+
+.profile-loading p {
+  color: #6c757d;
+}
+
+.profile-field {
+  margin-bottom: 2rem;
+}
+
+.profile-label {
+  font-weight: 600;
+  color: #2c2c2c;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.profile-label i {
+  margin-right: 0.5rem;
+}
+
+.profile-input {
+  border-radius: 15px !important;
+  border: 2px solid #e8e5e0 !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 1rem !important;
+  transition: all 0.3s ease !important;
+  background: #ffffff !important;
+}
+
+.profile-input:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.profile-input.name-input:focus {
+  border-color: #583015 !important;
+  box-shadow: 0 0 0 0.2rem rgba(88, 48, 21, 0.15) !important;
+}
+
+.profile-input.phone-input:focus {
+  border-color: #653312 !important;
+  box-shadow: 0 0 0 0.2rem rgba(101, 51, 18, 0.15) !important;
+}
+
+.profile-input.email-input:focus {
+  border-color: #583015 !important;
+  box-shadow: 0 0 0 0.2rem rgba(88, 48, 21, 0.15) !important;
+}
+
+.profile-alert {
+  border-radius: 15px;
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.profile-alert i {
+  margin-right: 0.5rem;
+}
+
+.profile-alert.error {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.profile-alert.success {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.profile-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.profile-btn {
+  flex: 1;
+  border-radius: 15px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  border: none;
+  transition: all 0.3s ease;
+  transform: translateY(0);
+  color: #fff;
+}
+
+.profile-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.profile-btn.back-btn {
+  background: #FFEEA9;
+  color: #583015;
+}
+
+.profile-btn.back-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 15px rgba(255, 238, 169, 0.5);
+  color: #653312;
+}
+
+.profile-btn.save-btn {
+  background: linear-gradient(135deg, #583015 0%, #653312 100%);
+}
+
+.profile-btn.save-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 15px rgba(88, 48, 21, 0.3);
+}
+
+.profile-btn.save-btn:disabled {
+  background: #ccc !important;
+  cursor: not-allowed;
+}
+
+.profile-btn i {
+  margin-right: 0.5rem;
+}
+
+.profile-spinner {
+  margin-right: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 1rem 0.5rem;
+  }
+  
+  .profile-buttons {
+    flex-direction: column;
+  }
+  
+  .profile-avatar {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .profile-avatar i {
+    font-size: 1.5rem;
+  }
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-form-card {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.profile-header-card {
+  animation: fadeIn 0.3s ease-out;
+}

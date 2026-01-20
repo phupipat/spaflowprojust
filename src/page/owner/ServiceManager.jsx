@@ -9,6 +9,8 @@ function ServiceManager() {
   const [duration, setDuration] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('');
   const [image, setImage] = useState(null);
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({ name: '', duration: '', price: '', description: '', imageUrl: '', type: '' });
@@ -38,11 +40,32 @@ function ServiceManager() {
       setLoading(false);
     };
     fetchServices();
-  }, [sortBy, sortOrder]); // เพิ่ม dependencies สำหรับการจัดเรียง
+  }, [sortBy, sortOrder, filterType, searchTerm]); // เพิ่ม dependencies สำหรับการค้นหาและฟิลเตอร์
 
   // ฟังก์ชันสำหรับจัดเรียงข้อมูล
   const sortServices = (servicesArray, sortField, order) => {
-    return [...servicesArray].sort((a, b) => {
+    // กรองข้อมูลตามคำค้นหาและประเภท
+    let filteredServices = [...servicesArray];
+    
+    // กรองตามคำค้นหา
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filteredServices = filteredServices.filter(service => 
+        service.name?.toLowerCase().includes(term) || 
+        service.description?.toLowerCase().includes(term) || 
+        service.id?.toLowerCase().includes(term)
+      );
+    }
+    
+    // กรองตามประเภท
+    if (filterType) {
+      filteredServices = filteredServices.filter(service => 
+        service.type === filterType
+      );
+    }
+    
+    // จัดเรียงข้อมูล
+    return filteredServices.sort((a, b) => {
       let aValue = a[sortField];
       let bValue = b[sortField];
       
@@ -74,6 +97,16 @@ function ServiceManager() {
       setSortBy(field);
       setSortOrder('asc');
     }
+  };
+
+  // ฟังก์ชันสำหรับค้นหาบริการ
+  const handleSearch = (term) => {
+    setSearchTerm(term);
+  };
+  
+  // ฟังก์ชันสำหรับกรองตามประเภท
+  const handleTypeFilter = (type) => {
+    setFilterType(type);
   };
 
   // อัปโหลดรูปภาพไป Firebase Storage และคืน URL
@@ -198,12 +231,16 @@ function ServiceManager() {
           <i className="fas fa-spa me-2 text-primary"></i>
           จัดการบริการนวด
         </h4>
-        <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
-          <i className="fas fa-plus me-1"></i> เพิ่มบริการใหม่
+        <button className="btn btn-brown" onClick={() => setShowAddForm(!showAddForm)}>
+          {showAddForm ? (
+            <><i className="fas fa-chevron-up me-1"></i> ซ่อนฟอร์ม</>
+          ) : (
+            <><i className="fas fa-plus me-1"></i> เพิ่มบริการใหม่</>
+          )}
         </button>
       </div>
-      <div className={`collapse ${showAddForm ? 'show' : ''}`} id="addServiceForm">
-      <div className="card mb-4 bg-light">
+      {showAddForm && (
+      <div className="card mb-4 bg-light shadow-sm">
         <div className="card-body">
           <form className="row g-3" onSubmit={editId ? handleEdit : handleAdd}>
             <div className="col-md-3">
@@ -247,7 +284,7 @@ function ServiceManager() {
             <div className="col-12">
               <div className="d-flex justify-content-end gap-2 mt-3">
                 {editId && <button type="button" className="btn btn-secondary" onClick={() => setEditId(null)}>ยกเลิก</button>}
-                <button type="submit" className={`btn ${editId ? 'btn-warning' : 'btn-success'}`}>
+                <button type="submit" className="btn" style={{ backgroundColor: editId ? '#a86a3d' : '#7B4019', color: 'white' }}>
                   <i className={`fas ${editId ? 'fa-save' : 'fa-plus'} me-1`}></i>
                   {editId ? 'บันทึกการแก้ไข' : 'เพิ่มบริการ'}
                 </button>
@@ -256,7 +293,7 @@ function ServiceManager() {
           </form>
         </div>
       </div>
-      </div>
+      )}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="mb-0">รายการบริการ</h5>
         <div className="d-flex gap-2 align-items-center">
@@ -264,42 +301,58 @@ function ServiceManager() {
           <div className="btn-group" role="group" aria-label="Sort options">
             <button 
               type="button" 
-              className={`btn btn-sm ${sortBy === 'id' ? 'btn-primary' : 'btn-outline-primary'}`}
+              className={`btn btn-sm ${sortBy === 'id' ? 'btn-brown' : 'btn-outline-secondary'}`}
               onClick={() => handleSortChange('id')}
             >
               รหัสบริการ {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
             <button 
               type="button" 
-              className={`btn btn-sm ${sortBy === 'name' ? 'btn-primary' : 'btn-outline-primary'}`}
+              className={`btn btn-sm ${sortBy === 'name' ? 'btn-brown' : 'btn-outline-secondary'}`}
               onClick={() => handleSortChange('name')}
             >
               ชื่อบริการ {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
             <button 
               type="button" 
-              className={`btn btn-sm ${sortBy === 'duration' ? 'btn-primary' : 'btn-outline-primary'}`}
+              className={`btn btn-sm ${sortBy === 'duration' ? 'btn-brown' : 'btn-outline-secondary'}`}
               onClick={() => handleSortChange('duration')}
             >
               ระยะเวลา {sortBy === 'duration' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
           </div>
           
-          <select className="form-select form-select-sm" style={{ width: 'auto' }} onChange={(e) => handleSortChange('type')}>
-            <option value="">ประเภทบริการ</option>
+          <select 
+            className="form-select form-select-sm" 
+            style={{ width: 'auto' }} 
+            value={filterType}
+            onChange={(e) => handleTypeFilter(e.target.value)}
+          >
+            <option value="">ทุกประเภท</option>
             <option value="MASSAGE">MASSAGE</option>
             <option value="AROMA MASSAGE">AROMA MASSAGE</option>
             <option value="SPA">SPA</option>
             <option value="ONSEN">ONSEN</option>
           </select>
           
-          <input 
-            type="text" 
-            className="form-control form-control-sm" 
-            placeholder="ค้นหา..." 
-            style={{ width: '200px' }} 
-            onChange={(e) => console.log(e.target.value)}
-          />
+          <div className="position-relative" style={{ width: '200px' }}>
+            <input 
+              type="text" 
+              className="form-control form-control-sm" 
+              placeholder="ค้นหา..." 
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+            {searchTerm && (
+              <button 
+                className="btn btn-sm position-absolute" 
+                style={{ right: '0', top: '0', border: 'none' }}
+                onClick={() => setSearchTerm('')}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {loading ? (
@@ -311,15 +364,34 @@ function ServiceManager() {
         </div>
       ) : (
         <div className="row g-3">
-          {services.length === 0 && <div className="col-12 text-center py-5 text-muted">ยังไม่มีบริการ <button className="btn btn-sm btn-primary ms-2" onClick={() => setShowAddForm(true)}>เพิ่มบริการใหม่</button></div>}
+          {services.length === 0 && <div className="col-12 text-center py-5 text-muted">ยังไม่มีบริการ <button className="btn btn-brown ms-2" onClick={() => setShowAddForm(true)}><i className="fas fa-plus-circle me-1"></i> เพิ่มบริการใหม่</button></div>}
           {services.map((s) => (
             <div key={s.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
-              <div className="card h-100 shadow-sm">
+              <div 
+                className="card h-100 shadow-sm service-card-animate"
+                tabIndex={0}
+                style={{ cursor: 'pointer' }}
+                onClick={e => {
+                  // ไม่เปิด modal เมื่อคลิกที่การ์ด ยกเลิกการทำงานเดิม
+                  if (
+                    e.target.closest('.btn-outline-warning') ||
+                    e.target.closest('.btn-outline-danger')
+                  ) return;
+                  // ถ้าต้องการดูรายละเอียด ให้คลิกที่ปุ่มแก้ไขแทน
+                  // ทำให้การคลิกที่การ์ดไม่มีการตอบสนอง
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    // ไม่เปิด modal เมื่อกด Enter/Space
+                  }
+                }}
+              >
                 <div className="position-relative">
                   {s.imageUrl ? (
-                    <img src={s.imageUrl} alt="service" className="card-img-top" style={{ height: 160, objectFit: 'cover' }} />
+                    <img src={s.imageUrl} alt="service" className="card-img-top" style={{ height: 160, objectFit: 'cover', pointerEvents: 'none' }} />
                   ) : (
-                    <div className="bg-light d-flex align-items-center justify-content-center" style={{ height: 160 }}>
+                    <div className="bg-light d-flex align-items-center justify-content-center" style={{ height: 160, pointerEvents: 'none' }}>
                       <i className="fas fa-spa" style={{ fontSize: '48px', color: '#ccc' }}></i>
                     </div>
                   )}
@@ -332,14 +404,11 @@ function ServiceManager() {
                   <p className="card-text mb-2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{s.description}</p>
                   {s.createdAt && <p className="card-text text-muted small mb-2"><i className="far fa-calendar-alt me-1"></i>เพิ่มเมื่อ: {s.createdAt.toLocaleString()}</p>}
                   <div className="d-grid gap-2 mt-auto">
-                    <button className="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target={`#detailModal${s.id}`}>
-                      <i className="fas fa-info-circle me-1"></i> ดูรายละเอียด
-                    </button>
                     <div className="d-flex justify-content-center gap-2">
-                      <button className="btn btn-sm btn-outline-warning" onClick={() => startEdit(s)}>
+                      <button className="btn btn-sm" style={{ borderColor: '#a86a3d', color: '#a86a3d' }} onClick={e => { e.stopPropagation(); startEdit(s); }}>
                         <i className="fas fa-edit me-1"></i> แก้ไข
                       </button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(s.id)}>
+                      <button className="btn btn-sm btn-outline-danger" onClick={e => { e.stopPropagation(); handleDelete(s.id); }}>
                         <i className="fas fa-trash-alt me-1"></i> ลบ
                       </button>
                     </div>
@@ -347,75 +416,63 @@ function ServiceManager() {
                 </div>
               </div>
               {/* Modal for detail */}
-              <div className="modal fade" id={`detailModal${s.id}`} tabIndex="-1" aria-labelledby={`detailModalLabel${s.id}`} aria-hidden="true">
+              <div className="modal fade service-detail-modal-fade" id={`detailModal${s.id}`} tabIndex="-1" aria-labelledby={`detailModalLabel${s.id}`} aria-hidden="true">
                 <div className="modal-dialog modal-lg">
-                  <div className="modal-content">
-                    <div className="modal-header" style={{ background: 'linear-gradient(to right, #f8f9fa, #e9ecef)' }}>
-                      <h5 className="modal-title" id={`detailModalLabel${s.id}`}>
+                  <div className="modal-content service-detail-modal-content">
+                    <div className="modal-header border-0" style={{ background: 'linear-gradient(90deg, #fff 60%, #f7e7d7 100%)', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: '1.5rem 2rem 1rem 2rem' }}>
+                      <h5 className="modal-title fw-bold d-flex align-items-center gap-2" id={`detailModalLabel${s.id}`} style={{ fontSize: '1.35rem', color: '#9a3b0b' }}>
                         <i className="fas fa-spa me-2 text-primary"></i>
                         {s.name}
                       </h5>
                       <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div className="modal-body">
-                      <div className="row">
-                        <div className="col-md-5">
-                          {s.imageUrl ? (
-                            <img src={s.imageUrl} alt="service" className="img-fluid rounded shadow mb-3" style={{ maxHeight: 300, objectFit: 'cover', width: '100%' }} />
-                          ) : (
-                            <div className="bg-light d-flex align-items-center justify-content-center rounded" style={{ height: 300 }}>
-                              <i className="fas fa-spa" style={{ fontSize: '64px', color: '#ccc' }}></i>
-                            </div>
-                          )}
-                          <div className="d-flex justify-content-between">
-                            <span className="badge bg-primary" style={{ fontSize: '1rem' }}><i className="fas fa-tag me-1"></i> {s.price} บาท</span>
-                            <span className="badge bg-secondary" style={{ fontSize: '1rem' }}><i className="fas fa-list me-1"></i> {s.type || 'MASSAGE'}</span>
+                    <div className="modal-body" style={{ background: '#fff', borderBottomLeftRadius: 16, borderBottomRightRadius: 16, padding: '2rem' }}>
+                      <div className="row g-4 align-items-stretch">
+                        <div className="col-md-5 d-flex flex-column align-items-center justify-content-center">
+                          <div style={{ width: '100%', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+                            {s.imageUrl ? (
+                              <img src={s.imageUrl} alt="service" className="img-fluid" style={{ maxHeight: 260, objectFit: 'cover', width: '100%' }} />
+                            ) : (
+                              <div className="bg-light d-flex align-items-center justify-content-center" style={{ height: 260 }}>
+                                <i className="fas fa-spa" style={{ fontSize: '64px', color: '#ccc' }}></i>
+                              </div>
+                            )}
+                          </div>
+                          <div className="d-flex justify-content-between w-100 mt-3">
+                            <span className="badge bg-primary px-3 py-2" style={{ fontSize: '1rem', borderRadius: 12, fontWeight: 600 }}><i className="fas fa-tag me-1"></i> {s.price} บาท</span>
+                            <span className="badge bg-warning text-dark px-3 py-2" style={{ fontSize: '1rem', borderRadius: 12, fontWeight: 600 }}><i className="fas fa-list me-1"></i> {s.type || 'MASSAGE'}</span>
                           </div>
                         </div>
-                        <div className="col-md-7">
-                          <div className="card mb-3">
-                            <div className="card-header bg-light">
-                              <i className="fas fa-info-circle me-2"></i>ข้อมูลบริการ
+                        <div className="col-md-7 d-flex flex-column justify-content-between">
+                          <div className="p-4 shadow-sm rounded-4 mb-3" style={{ background: 'linear-gradient(120deg, #fff 80%, #f7e7d7 100%)', border: '1px solid #f3e0c7' }}>
+                            <div className="mb-3">
+                              <span className="fw-bold text-brown" style={{ color: '#9a3b0b' }}><i className="fas fa-info-circle me-2"></i>ข้อมูลบริการ</span>
                             </div>
-                            <div className="card-body">
-                              <div className="mb-3">
-                                <label className="form-label fw-bold">รหัสบริการ:</label>
-                                <div>{s.id || '-'}</div>
-                              </div>
-                              <div className="mb-3">
-                                <label className="form-label fw-bold">ระยะเวลา:</label>
-                                <div><i className="far fa-clock me-1"></i> {s.duration} นาที</div>
-                              </div>
-                              <div className="mb-3">
-                                <label className="form-label fw-bold">คำอธิบาย:</label>
-                                <div>{s.description}</div>
-                              </div>
-                              {s.createdAt && (
-                                <div className="mb-0">
-                                  <label className="form-label fw-bold">เพิ่มเมื่อ:</label>
-                                  <div><i className="far fa-calendar-alt me-1"></i> {s.createdAt.toLocaleString()}</div>
-                                </div>
-                              )}
-                            </div>
+                            <div className="mb-2"><span className="fw-bold">รหัสบริการ:</span> <span className="ms-2">{s.id || '-'}</span></div>
+                            <div className="mb-2"><span className="fw-bold">ระยะเวลา:</span> <span className="ms-2"><i className="far fa-clock me-1"></i> {s.duration} นาที</span></div>
+                            <div className="mb-2"><span className="fw-bold">คำอธิบาย:</span> <span className="ms-2">{s.description}</span></div>
+                            {s.createdAt && (
+                              <div className="mb-0"><span className="fw-bold">เพิ่มเมื่อ:</span> <span className="ms-2"><i className="far fa-calendar-alt me-1"></i> {s.createdAt.toLocaleString()}</span></div>
+                            )}
                           </div>
-                          <div className="d-flex gap-2">
-                            <button className="btn btn-warning" onClick={() => { startEdit(s); document.querySelector(`button[data-bs-dismiss="modal"][aria-label="Close"]`).click(); }}>
-                              <i className="fas fa-edit me-1"></i> แก้ไขบริการ
+                          <div className="d-flex gap-2 justify-content-end mt-2">
+                            <button className="btn btn-warning px-4 py-2 fw-bold d-flex align-items-center gap-2" style={{ borderRadius: 10 }} onClick={() => { startEdit(s); document.querySelector(`button[data-bs-dismiss=\"modal\"][aria-label=\"Close\"]`).click(); }}>
+                              <i className="fas fa-edit"></i> แก้ไขบริการ
                             </button>
-                            <button className="btn btn-danger" onClick={() => { 
+                            <button className="btn btn-danger px-4 py-2 fw-bold d-flex align-items-center gap-2" style={{ borderRadius: 10 }} onClick={() => { 
                               if (window.confirm(`ต้องการลบบริการ ${s.name} ใช่หรือไม่?`)) {
                                 handleDelete(s.id); 
-                                document.querySelector(`button[data-bs-dismiss="modal"][aria-label="Close"]`).click();
+                                document.querySelector(`button[data-bs-dismiss=\"modal\"][aria-label=\"Close\"]`).click();
                               }
                             }}>
-                              <i className="fas fa-trash-alt me-1"></i> ลบบริการ
+                              <i className="fas fa-trash-alt"></i> ลบบริการ
                             </button>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="modal-footer bg-light">
-                      <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+                    <div className="modal-footer bg-light border-0" style={{ borderBottomLeftRadius: 16, borderBottomRightRadius: 16, padding: '1.2rem 2rem' }}>
+                      <button type="button" className="btn btn-secondary px-4 py-2 fw-bold" style={{ borderRadius: 10 }} data-bs-dismiss="modal">ปิด</button>
                     </div>
                   </div>
                 </div>
@@ -427,5 +484,42 @@ function ServiceManager() {
     </div>
   );
 }
+
+
+
+// เพิ่ม CSS transition สำหรับการ์ดบริการและ modal fade-in/fade-out
+const style = document.createElement('style');
+style.innerHTML = `
+  .service-card-animate {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    will-change: transform, box-shadow;
+    transform: translateZ(0);
+  }
+  .service-card-animate:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+    z-index: 2;
+  }
+  .service-detail-modal-fade .modal-dialog {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform: translateY(30px);
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+  .service-detail-modal-fade.show .modal-dialog {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  .service-detail-modal-content {
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 1.5px 4px rgba(0,0,0,0.08);
+    border-radius: 18px;
+    transition: box-shadow 0.2s cubic-bezier(0.4,0,0.2,1);
+  }
+  .modal-backdrop.show {
+    opacity: 0.45 !important;
+    z-index: 1050;
+  }
+`;
+document.head.appendChild(style);
 
 export default ServiceManager;
